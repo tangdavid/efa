@@ -21,7 +21,7 @@ class dataset:
         for i in range(self.m):
             p = np.random.beta(2, 2)
             snps = np.random.binomial(2, p, self.n)
-            geno.T[i] = snps - (2*p)/np.sqrt(2*p*(1-p))
+            geno.T[i] = (snps - (2*p))/np.sqrt(2*p*(1-p))
 
         inter = linalg.khatri_rao(geno.T, geno.T).T
         self.geno, self.inter = geno, inter
