@@ -62,8 +62,7 @@ class dataset:
         beta = np.sum(pathways, axis=1, keepdims=True)
                 
         # currently generate weights from normal (0, 1)
-        weights = np.ones(k*k).reshape(k, -1)
-        #weights = np.random.normal(0, 1, k * k).reshape(k, -1) 
+        weights = np.random.normal(0, 1, k * k).reshape(k, -1) 
         weights = np.tril(weights, -1) + np.tril(weights, -1).T
         
         # simulate interaction matrix by summing over weighted outerproducts
@@ -107,7 +106,7 @@ class decomp:
         
         G = self.data.geno
         inter = self.data.inter
-        Y = self.data.pheno#.reshape(-1, 1)
+        Y = self.data.pheno
         
         thresh = 0.0005
                 
