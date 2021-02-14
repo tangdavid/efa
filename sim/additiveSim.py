@@ -159,7 +159,8 @@ class decomp:
             
             # monitor convergence
             iterations += 1
-            if linalg.norm(pathways -  pathwaysPrev) < thresh: break
+            diff = linalg.norm(pathways -  pathwaysPrev)
+            if diff/linalg.norm(pathwaysPrev) < thresh: break
         
         # set weights and pathways
         self.weights = weights
