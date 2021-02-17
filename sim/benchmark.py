@@ -1,16 +1,16 @@
-from sim import dataset, decomp
+from additiveSim import dataset, decomp
 import numpy as np
 import time
 import csv
 
 data = list()
 
-def timeMethods(ind, snps, method, k = 1, h2 = 0.9, noise = 0):
+def timeMethods(ind, snps, method, k, h2, sbeta, somega):
     benchmark = decomp()
     ret = list()
-    for i in range(10):
+    for i in range(15):
         simStart = time.time()
-        benchmark.simData(ind, snps, k = k, h2 = h2, noise = noise)
+        benchmark.simData(ind, snps, k = k, h2 = h2, sbeta = sbeta, somega = somega)
         simEnd = time.time()
 
         if method == "direct":
@@ -28,33 +28,38 @@ def timeMethods(ind, snps, method, k = 1, h2 = 0.9, noise = 0):
             benchmark.symmetricDecomp()
             end = time.time()
 
-        _, ufit, vfit = benchmark.evalNorm()
+        fit = benchmark.evalAcc()
+        loss = benchmark.getLoss(benchmark.pathways, benchmark.weights)
 
         simTime = simEnd - simStart
         fitTime = end - start
-        decompAcc = ufit
+        decompAcc = fit
 
-        ret.append((ind, snps, simTime, fitTime, decompAcc, method))
+        ret.append((ind, snps, k, h2, sbeta, somega,
+                    simTime, fitTime, decompAcc, loss, method))
         
     return(ret)
     
 
-for noise  in np.linspace(0, 1, 5):
-    for m in np.linspace(1, 2, 5):
+for k in range(2, 6):
+    for h2 in np.linspace(0.1, 0.9, 3):
+        for sbeta  in np.linspace(0, 1, 3):
+            for somega in np.linspace(0, 1, 3):
+                for m in np.linspace(1, 2, 4):
+                    n = 5
+                    h2 = 0.9
+                    ind = round(10 ** n)
+                    snps = round(10 ** m)
 
-        n = 5
-
-        ind = round(10 ** n)
-        snps = round(10 ** m)
-
-        print(noise, ind, snps)
-
-        data += (timeMethods(ind, snps, "ridge", noise = noise, k = 1, h2 = 0.9))
-        data += (timeMethods(ind, snps, "marginal", noise = noise, k = 1, h2 = 0.9))
-        data += (timeMethods(ind, snps, "direct", noise = noise, k = 1, h2 = 0.9))
+                    print(k, h2, sbeta, somega, ind, snps)
+                    data += (timeMethods(ind, snps, "direct", sbeta = sbeta, somega = somega, k = k, h2 = h2))
+                break
+            break
+        break
 
 with open('./benchmark.csv','w') as out:
     csvOut=csv.writer(out)
-    csvOut.writerow(['n','m', 'simTime', 'fitTime', 'acc', 'method'])
+    csvOut.writerow(['n','m', 'k', 'h2', 'sbeta', 'somega', 
+                     'simTime', 'fitTime', 'acc', 'loss', 'method'])
     for row in data:
         csvOut.writerow(row)
