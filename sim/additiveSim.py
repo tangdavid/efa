@@ -64,7 +64,7 @@ class dataset:
 
         # currently generate weights from normal (0, 1)
         # weights = np.ones(k*k).reshape(k, -1)
-        weights = np.random.normal(0, 1, k * k).reshape(k, -1)
+        weights = np.random.normal(0, 0.1, k * k).reshape(k, -1)
         if selfInteraction:
             weights = np.tril(weights, 1) + np.tril(weights, -1).T
         else:
@@ -94,7 +94,7 @@ class dataset:
         # add noise to simulate heritability
         var = np.var(mean) * (1 - self.h2)/self.h2
         sd = np.sqrt(var)
-        noise = np.random.normal(0, sd, self.n).reshape(-1, 1)
+        noise = np.random.normal(0, 0, self.n).reshape(-1, 1)
         self.pheno = mean + noise
  
 
@@ -113,13 +113,13 @@ class decomp:
         inter = self.data.inter
         Y = self.data.pheno#.reshape(-1, 1)
         
-        thresh = 0.005
+        thresh = 0.001
                 
         # initialize pathways and weights
-        weights = np.random.normal(0, 1, k * k).reshape(k, -1) 
+        weights = np.random.normal(0, 0.1, k * k).reshape(k, -1) 
         #weights = np.ones(k * k).reshape(k, -1) 
         weights = np.tril(weights, -1) + np.tril(weights, -1).T
-        pathways = np.random.normal(0, 1/10, m * k).reshape(m, k)
+        pathways = np.random.normal(0, 1, m * k).reshape(m, k)
         iterations = 0
         
         prevLoss = currentLoss = self.getLoss(pathways, weights)
@@ -168,9 +168,10 @@ class decomp:
             
             prevLoss = currentLoss
             currentLoss = self.getLoss(pathways, weights)
-            lossList.append(currentLoss)
+            if iterations % 10 == 0: lossList.append(currentLoss)
             
-            if np.abs(currentLoss - prevLoss) < thresh: break
+            #if np.abs(currentLoss - prevLoss) < thresh: break
+            if iterations > 700: break
             #if iterations % 10 == 0:
             #    print("(iterations,loss):", iterations, round(currentLoss, 3))
             
@@ -189,8 +190,8 @@ class decomp:
         # initialization
         #weights = np.ones(k * k).reshape(k, -1) 
         
-        weights = np.random.normal(0, 1, k * k).reshape(k, -1) 
-        weights = np.tril(weights, 0) + np.tril(weights, -1).T
+        weights = np.random.normal(0, 0.1, k * k).reshape(k, -1) 
+        weights = np.tril(weights, -1) + np.tril(weights, -1).T
         weights = torch.tensor(weights, requires_grad = True)
 
         pathways = torch.randn(m, k, requires_grad = True, dtype=torch.float64)
@@ -220,9 +221,10 @@ class decomp:
             # monitor convergence
             prevLoss = currentLoss
             currentLoss = loss.item()
-            lossList.append(currentLoss)
 
-            if np.abs(currentLoss - prevLoss) < thresh: break
+            if iterations % 100 == 0: lossList.append(currentLoss)
+            if iterations > 7000: break
+            #if np.abs(currentLoss - prevLoss) < thresh and iterations > 1: break
             #if iterations % 1000 == 0: 
             #    print("(iterations,loss):", iterations, round(currentLoss, 3))
             
