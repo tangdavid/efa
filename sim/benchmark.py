@@ -1,65 +1,36 @@
-from additiveSim import dataset, decomp
-import numpy as np
-import time
-import csv
+from sim import *
+import argparse
 
-data = list()
 
-def timeMethods(ind, snps, method, k, h2, sbeta, somega):
-    benchmark = decomp()
-    ret = list()
-    for i in range(15):
-        simStart = time.time()
-        benchmark.simData(ind, snps, k = k, h2 = h2, sbeta = sbeta, somega = somega)
-        simEnd = time.time()
+parser = argparse.ArgumentParser()
+parser.add_argument("k", help="number of latent pathways", type=int)
+parser.add_argument("repeat", help="index of repeat", type=int)
+args = parser.parse_args()
 
-        if method == "direct":
-            start = time.time()
-            benchmark.directDecomp()
-            end = time.time()
-        elif method == "marginal":
-            start = time.time()
-            benchmark.fitMarginal()
-            benchmark.symmetricDecomp()
-            end = time.time()
-        else:
-            start = time.time()
-            benchmark.fitRidge()
-            benchmark.symmetricDecomp()
-            end = time.time()
+res = dict()
+k = args.k
+repeat = args.repeat
+name = 'anchor_strength_k%d_repeat%d' % (k, repeat)
+print(name)
 
-        fit = benchmark.evalAcc()
-        loss = benchmark.getLoss(benchmark.pathways, benchmark.weights)
+for anchor_strength in np.linspace(0, 0.9, 10):
+    data = Dataset(10000, 20, k = k, h2=0.7, additive_model_var=0.5, anchor_strength=anchor_strength)
+    oos = tools.generateOOS(data, 10000)
+    min_loss = np.float('inf')
+    pathways = None
 
-        simTime = simEnd - simStart
-        fitTime = end - start
-        decompAcc = fit
+    for restart in range(1):
+        decomp = Decomp()
+        decomp.gradDescent(data)
+        loss = decomp.loss[-1]
+        if loss < min_loss:
+            min_loss = loss
+            pathways = decomp.pathways           
+            accPathways = decomp.evalPathwayAcc(data)
+            accPheno = decomp.evalPhenoAcc(data)
+            
+    res[np.round(anchor_strength, 1)] = (accPathways[0], accPathways[1], accPheno)
 
-        ret.append((ind, snps, k, h2, sbeta, somega,
-                    simTime, fitTime, decompAcc, loss, method))
+with open('./anchor/' + name + 'pkl', 'wb') as f:
+    pkl.dump(res, f)
         
-    return(ret)
-    
-
-for k in range(2, 6):
-    for h2 in np.linspace(0.1, 0.9, 3):
-        for sbeta  in np.linspace(0, 1, 3):
-            for somega in np.linspace(0, 1, 3):
-                for m in np.linspace(1, 2, 4):
-                    n = 5
-                    h2 = 0.9
-                    ind = round(10 ** n)
-                    snps = round(10 ** m)
-
-                    print(k, h2, sbeta, somega, ind, snps)
-                    data += (timeMethods(ind, snps, "direct", sbeta = sbeta, somega = somega, k = k, h2 = h2))
-                break
-            break
-        break
-
-with open('./benchmark.csv','w') as out:
-    csvOut=csv.writer(out)
-    csvOut.writerow(['n','m', 'k', 'h2', 'sbeta', 'somega', 
-                     'simTime', 'fitTime', 'acc', 'loss', 'method'])
-    for row in data:
-        csvOut.writerow(row)
