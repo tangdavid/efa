@@ -11,11 +11,11 @@ args = parser.parse_args()
 res = list()
 k = args.k
 repeat = args.repeat
-name = 'anchor_strength_k%d_repeat%d' % (k, repeat)
+name = 'h2_k%d_repeat%d' % (k, repeat)
 print(name)
 
-for anchor_strength in np.linspace(0, 0.9, 10):
-    data = Dataset(10000, 20, k = k, h2=0.7, additive_model_var=0.5, anchor_strength=anchor_strength)
+for h2 in np.linspace(0.1, 1, 10):
+    data = Dataset(10000, 20, k = k, h2=h2)
     oos = tools.generateOOS(data, 10000)
     min_loss = float('inf')
     pathways = None
@@ -31,16 +31,16 @@ for anchor_strength in np.linspace(0, 0.9, 10):
             accPheno = decomp.evalPhenoAcc(data)
             
 
-    res.append([np.round(anchor_strength, 1), 
+    res.append([np.round(h2, 1), 
                 accPathways[0], 
                 accPathways[1], 
                 accPheno,
                 k,
                 repeat])
 
-    print("done with anchor_strength %0.1f" %anchor_strength)
+    print("done with h2 %0.1f" %h2)
 
-with open('./anchor-strength/' + name + '.csv', 'w') as f:
+with open('./h2/' + name + '.csv', 'w') as csvfile:
     writer = csv.writer(csvfile)
     for row in res:
         writer.writerow(row)
