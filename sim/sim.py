@@ -31,6 +31,8 @@ class tools:
     def evalAcc(p1, p2):
         maxCorr = 0
         if p1.shape[1] != p2.shape[1]:
+            
+            
             print('error: wrong dimensions')
             return
         
@@ -120,9 +122,12 @@ class Dataset:
         omega = tools.outer(pathways, weights)
 
         # adding gaussian noise to additive and epistatic effects
-        var_eomega = np.var(omega) * (self.noise_omega/ (1 - self.noise_omega)) 
-        eomega = np.random.normal(0, np.sqrt(var_eomega), m * m).reshape(m, -1)
+        #var_eomega = np.var(omega) * (self.noise_omega/ (1 - self.noise_omega)) 
+        var_eomega = np.var(omega) * (self.noise_omega) 
+        eomega = np.random.normal(0, 1, size = (m, m))
+        eomega *= np.sqrt(var_eomega) / np.std(eomega)
         eomega = np.tril(eomega) + np.tril(eomega, -1).T
+        weights *= np.sqrt((1 - self.noise_omega))
         
         var_ebeta = np.var(beta) * (self.noise_beta/ (1 - self.noise_beta)) 
         ebeta = np.random.normal(0, np.sqrt(var_ebeta), m).reshape(-1, 1)
@@ -171,7 +176,7 @@ class Dataset:
         noise = np.random.normal(0, eps_std, self.n).reshape(-1, 1)
         self.pheno = mean + noise
                 
-class Decomp:
+class CEModel:
     def __init__(self):
         self.loss = None
         self.conv = True
@@ -352,6 +357,10 @@ class Decomp:
         withoutAnchors = tools.evalAcc(self.pathways[:-k], data.pathways[:-k])
         return (withAnchors, withoutAnchors)
     
+    def evalBetaAcc(self, data):
+        beta = np.sum(self.pathways, axis = 1, keepdims=True)
+        return stats.pearsonr(beta.reshape(-1,), data.beta.reshape(-1,))[0] ** 2
+    
     def evalPhenoAcc(self, data):
         prediction = self.predictPheno(data)
         return stats.pearsonr(prediction.reshape(-1,), data.pheno.reshape(-1,))[0] ** 2
@@ -361,7 +370,23 @@ class Decomp:
         omega = tools.outer(self.pathways, self.weights)
         return data.geno @ beta + data.inter @ omega.reshape(-1, 1)
         
-    
     def plotLoss(self):
         plt.plot(self.loss)
         plt.show()
+        
+class AdditiveModel:
+    def fitLinearRegression(self, data):
+        lr = LinearRegression()
+        lr.fit(data.geno, data.pheno)
+        self.beta = lr.coef_.reshape(-1, 1)
+        
+    def predictPheno(self, data):
+        return data.geno @ self.beta
+    
+    def evalBetaAcc(self, data):
+        return stats.pearsonr(self.beta.reshape(-1,), data.beta.reshape(-1,))[0] ** 2
+    
+    def evalPhenoAcc(self, data):
+        prediction = self.predictPheno(data)
+        return stats.pearsonr(prediction.reshape(-1,), data.pheno.reshape(-1,))[0] ** 2
+        

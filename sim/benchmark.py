@@ -8,40 +8,64 @@ parser.add_argument("k", help="number of latent pathways", type=int)
 parser.add_argument("repeat", help="index of repeat", type=int)
 args = parser.parse_args()
 
-res = list()
+res_CE = list()
+res_additive = list()
 k = args.k
 repeat = args.repeat
-name = 'h2_k%d_repeat%d' % (k, repeat)
-print(name)
+prefix = './additive-var/'
+suffix = '_k%d_repeat%d' % (k, repeat)
 
-for h2 in np.linspace(0.1, 1, 10):
-    data = Dataset(10000, 20, k = k, h2=h2)
-    oos = tools.generateOOS(data, 10000)
+with open(prefix + 'training' + suffix + '.pkl', 'wb') as f:
+    training = pkl.load(f)
+
+with open(prefix + 'validation' + suffix + '.pkl', 'wb') as f:
+    validation = pkl.load(f)
+
+for param in training.key():
+    data = training[param]
+    oos = validation[param]
     min_loss = float('inf')
     pathways = None
 
     for restart in range(10):
-        decomp = Decomp()
-        decomp.gradDescent(data)
-        loss = decomp.loss[-1]
+        ceModel = CEModel()
+        ceModel.gradDescent(data)
+        loss = ceModel.loss[-1]
         if loss < min_loss:
             min_loss = loss
-            pathways = decomp.pathways           
-            accPathways = decomp.evalPathwayAcc(data)
-            accPheno = decomp.evalPhenoAcc(data)
+            pathways = ceModel.pathways           
+            accPathwaysCE = ceModel.evalPathwayAcc(data)
+            accPhenoCE = ceModel.evalPhenoAcc(data)
+            accBetaCE = ceModel.evalPhenoAcc(data)
+            
+    additiveModel = AdditiveModel()
+    additiveModel.fitLinearRegression(data)
+    accPhenoAdditive = additiveModel.evalPhenoAcc(data)
+    accBetaAdditive = additiveModel.evalBetaAcc(data)
             
 
-    res.append([np.round(h2, 1), 
-                accPathways[0], 
-                accPathways[1], 
-                accPheno,
-                k,
-                repeat])
+    res_CE.append([param, 
+                   accPathwaysCE[0], 
+                   accPathwaysCE[1], 
+                   accPhenoCE,
+                   accBetaCE,
+                   k,
+                   repeat])
+    
+    res_additive.append([param,
+                         accPhenoCE,
+                         accBetaCE,
+                         k,
+                         repeat])
+                         
 
     print("done with h2 %0.1f" %h2)
 
-with open('./h2/' + name + '.csv', 'w') as csvfile:
+with open(prefix + 'CE' + suffix + '.csv', 'w') as csvfile:
     writer = csv.writer(csvfile)
-    for row in res:
-        writer.writerow(row)
+    for row in res_CE: writer.writerow(row)
+        
+with open(prefix + 'additive' + suffix + '.csv', 'w') as csvfile:
+    writer = csv.writer(csvfile)
+    for row in res_additive: writer.writerow(row)
         
