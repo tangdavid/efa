@@ -12,37 +12,36 @@ res_CE = list()
 res_additive = list()
 k = args.k
 repeat = args.repeat
-prefix = './additive-var/'
+prefix = './h2/'
 suffix = '_k%d_repeat%d' % (k, repeat)
 
-with open(prefix + 'training' + suffix + '.pkl', 'wb') as f:
+with open(prefix + 'training' + suffix + '.pkl', 'rb') as f:
     training = pkl.load(f)
 
-with open(prefix + 'validation' + suffix + '.pkl', 'wb') as f:
+with open(prefix + 'validation' + suffix + '.pkl', 'rb') as f:
     validation = pkl.load(f)
 
-for param in training.key():
+for param in training.keys():
     data = training[param]
     oos = validation[param]
     min_loss = float('inf')
     pathways = None
 
-    for restart in range(10):
-        ceModel = CEModel()
-        ceModel.gradDescent(data)
-        loss = ceModel.loss[-1]
+    for restart in range(20):
+        coordinatedModel = CoordinatedModel()
+        coordinatedModel.gradDescent(data)
+        loss = coordinatedModel.loss[-1]
         if loss < min_loss:
             min_loss = loss
-            pathways = ceModel.pathways           
-            accPathwaysCE = ceModel.evalPathwayAcc(data)
-            accPhenoCE = ceModel.evalPhenoAcc(data)
-            accBetaCE = ceModel.evalPhenoAcc(data)
+            pathways = coordinatedModel.pathways           
+            accPathwaysCE = coordinatedModel.evalPathwayAcc(data)
+            accPhenoCE = coordinatedModel.evalPhenoAcc(data)
+            accBetaCE = coordinatedModel.evalBetaAcc(data)
             
     additiveModel = AdditiveModel()
     additiveModel.fitLinearRegression(data)
     accPhenoAdditive = additiveModel.evalPhenoAcc(data)
     accBetaAdditive = additiveModel.evalBetaAcc(data)
-            
 
     res_CE.append([param, 
                    accPathwaysCE[0], 
@@ -53,13 +52,13 @@ for param in training.key():
                    repeat])
     
     res_additive.append([param,
-                         accPhenoCE,
-                         accBetaCE,
+                         accPhenoAdditive,
+                         accBetaAdditive,
                          k,
                          repeat])
                          
 
-    print("done with h2 %0.1f" %h2)
+    print("done with param %0.1f" %param)
 
 with open(prefix + 'CE' + suffix + '.csv', 'w') as csvfile:
     writer = csv.writer(csvfile)
