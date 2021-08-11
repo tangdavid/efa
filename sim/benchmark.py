@@ -29,7 +29,7 @@ for param in training.keys():
 
     for restart in range(20):
         coordinatedModel = CoordinatedModel()
-        coordinatedModel.gradDescent(data)
+        coordinatedModel.fitModel(data)
         loss = coordinatedModel.loss[-1]
         if loss < min_loss:
             min_loss = loss
@@ -39,7 +39,7 @@ for param in training.keys():
             accBetaCE = coordinatedModel.evalBetaAcc(data)
             
     additiveModel = AdditiveModel()
-    additiveModel.fitLinearRegression(data)
+    additiveModel.fitModel(data)
     accPhenoAdditive = additiveModel.evalPhenoAcc(data)
     accBetaAdditive = additiveModel.evalBetaAcc(data)
 

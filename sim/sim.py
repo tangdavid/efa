@@ -176,7 +176,7 @@ class Dataset:
         noise = np.random.normal(0, eps_std, self.n).reshape(-1, 1)
         self.pheno = mean + noise
                 
-class CEModel:
+class CoordinatedModel:
     def __init__(self):
         self.loss = None
         self.conv = True
@@ -239,7 +239,7 @@ class CEModel:
         self.pathways = pathways
         self.weights = weights
 
-    def gradDescent(self, data, reg = 0, progress = False, analyticalWeights = False):
+    def fitModel(self, data, reg = 0, progress = False, analyticalWeights = False):
         m = data.m
         k = data.k
 
@@ -300,6 +300,8 @@ class CEModel:
         
         self.loss = lossList
         self.pathways = pathways
+        self.beta = np.sum(self.pathways, axis = 1, keepdims=True)
+        self.omega = tools.outer(self.pathways, self.weights).reshape(-1, 1)
         self.weights = weights
         self.conv = conv
         
@@ -358,17 +360,17 @@ class CEModel:
         return (withAnchors, withoutAnchors)
     
     def evalBetaAcc(self, data):
-        beta = np.sum(self.pathways, axis = 1, keepdims=True)
-        return stats.pearsonr(beta.reshape(-1,), data.beta.reshape(-1,))[0] ** 2
+        return stats.pearsonr(self.beta.reshape(-1,), data.beta.reshape(-1,))[0] ** 2
+    
+    def evalOmegaAcc(self, data):
+        return stats.pearsonr(self.omega.reshape(-1,), data.omega.reshape(-1,))[0] ** 2
     
     def evalPhenoAcc(self, data):
         prediction = self.predictPheno(data)
         return stats.pearsonr(prediction.reshape(-1,), data.pheno.reshape(-1,))[0] ** 2
     
     def predictPheno(self, data):
-        beta = np.sum(self.pathways, axis = 1, keepdims=True)
-        omega = tools.outer(self.pathways, self.weights)
-        return data.geno @ beta + data.inter @ omega.reshape(-1, 1)
+        return data.geno @ self.beta + data.inter @ self.omega
         
     def plotLoss(self):
         plt.plot(self.loss)
@@ -382,6 +384,43 @@ class AdditiveModel:
         
     def predictPheno(self, data):
         return data.geno @ self.beta
+    
+    def evalBetaAcc(self, data):
+        return stats.pearsonr(self.beta.reshape(-1,), data.beta.reshape(-1,))[0] ** 2
+    
+    def evalPhenoAcc(self, data):
+        prediction = self.predictPheno(data)
+        return stats.pearsonr(prediction.reshape(-1,), data.pheno.reshape(-1,))[0] ** 2
+
+class UncoordinatedModel:
+    def fitBeta(self, data):
+        lr = LinearRegression()
+        lr.fit(data.geno, data.pheno)
+        self.beta = lr.coef_.reshape(-1, 1)
+        
+    def fitOmega(self, data):
+        lr = linear_model.LinearRegression(fit_intercept=True)
+        
+        Y = data.pheno - data.geno @ self.beta
+        omega = np.zeros(data.m ** 2)
+        for i in range(data.m):
+            for j in range(data.m):
+                idx = i * data.m + j    
+                interij = data.inter.T[idx]
+                regressors = interij.reshape(-1, 1)
+                lr.fit(regressors, Y)
+                omega[idx] = lr.coef_.reshape(-1,)[0]
+        self.omega = omega.reshape(-1, 1)
+    
+    def fitModel(self, data):
+        self.fitBeta(data)
+        self.fitOmega(data)
+        
+    def predictPheno(self, data):
+        return data.geno @ self.beta + data.inter @ self.omega
+    
+    def evalOmegaAcc(self, data):
+        return stats.pearsonr(self.omega.reshape(-1,), data.omega.reshape(-1,))[0] ** 2
     
     def evalBetaAcc(self, data):
         return stats.pearsonr(self.beta.reshape(-1,), data.beta.reshape(-1,))[0] ** 2
