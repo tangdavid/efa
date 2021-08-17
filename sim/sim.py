@@ -301,8 +301,8 @@ class CoordinatedModel:
         self.loss = lossList
         self.pathways = pathways
         self.beta = np.sum(self.pathways, axis = 1, keepdims=True)
-        self.omega = tools.outer(self.pathways, self.weights).reshape(-1, 1)
         self.weights = weights
+        self.omega = tools.outer(self.pathways, self.weights).reshape(-1, 1)
         self.conv = conv
         
     def getWeights(self, data, pathways, diag = True):
@@ -330,8 +330,6 @@ class CoordinatedModel:
         weights = weights + np.tril(weights, -1).T
         return weights
 
-        
-        
     def getLoss(self, data, pathways, weights, reg = 0, tensor = True):
         G = torch.tensor(data.geno) if tensor else data.geno
         Y = torch.tensor(data.pheno) if tensor else data.pheno
@@ -377,7 +375,7 @@ class CoordinatedModel:
         plt.show()
         
 class AdditiveModel:
-    def fitLinearRegression(self, data):
+    def fitModel(self, data):
         lr = LinearRegression()
         lr.fit(data.geno, data.pheno)
         self.beta = lr.coef_.reshape(-1, 1)
