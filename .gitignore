@@ -2,3 +2,5 @@
 *.Rmd
 *data/
 *.ipynb_checkpoints/
+*.ipynb
+*.pkl
