@@ -31,8 +31,6 @@ class tools:
     def evalAcc(p1, p2):
         maxCorr = 0
         if p1.shape[1] != p2.shape[1]:
-            
-            
             print('error: wrong dimensions')
             return
         
@@ -56,7 +54,7 @@ class tools:
     
 class Dataset:
     def __init__(self, n, m, k = 2,
-                 h2 = 1, noise_beta = 0, noise_omega = 0, additive_model_var = 0.5,
+                 h2 = 0.7, noise_beta = 0, noise_omega = 0, additive_model_var = 0.5,
                  sparse = 0, self_interactions = True, anchor_strength = 0.5):
         self.n = n
         self.m = m
@@ -177,7 +175,8 @@ class Dataset:
         self.pheno = mean + noise
                 
 class CoordinatedModel:
-    def __init__(self):
+    def __init__(self, k):
+        self.k = k
         self.loss = None
         self.conv = True
         self.pathways = None
@@ -185,7 +184,7 @@ class CoordinatedModel:
     
     def coordDescent(self, data, progress = False):
         m = data.m
-        k = data.k
+        k = self.k
 
         G = data.geno
         inter = data.inter
@@ -239,31 +238,21 @@ class CoordinatedModel:
         self.pathways = pathways
         self.weights = weights
 
-    def fitModel(self, data, reg = 0, progress = False, analyticalWeights = False):
+    def gradDescent(self, data, reg, progress, nullModel, additiveInit):
         m = data.m
-        k = data.k
+        k = self.k
 
         G = torch.tensor(data.geno, requires_grad = False).double()
         inter = torch.tensor(data.inter, requires_grad = False).double()
         Y = torch.tensor(data.pheno, requires_grad = False).double()
 
         tol = 1e-4
+        res = dict()
         
-        # for anchor snps
-        mask = torch.ones(size = (m, k))
-        mask[-k:, :] = torch.eye(k)
-        
-        # initialization
-        weights = np.random.normal(0, 0.1, size = (k, k))
-        weights = np.tril(weights, -1) + np.tril(weights, -1).T
-        weights = torch.tensor(weights, requires_grad = True)
-
-        pathways = np.random.normal(0, 0.1, size = (m, k))
-        pathways *= mask.detach().numpy()
-        pathways = torch.tensor(pathways, requires_grad = True)
+        weights, pathways, mask = self.initPathways(data, nullModel, additiveInit)
         
         # use Adam to optimize 
-        params = [pathways] if analyticalWeights else [weights, pathways]
+        params = [pathways] if nullModel else [weights, pathways]
         optimizer = optim.Adam(params)
         prevLoss = currentLoss = self.getLoss(data, pathways, weights).item()
         
@@ -274,9 +263,6 @@ class CoordinatedModel:
         
         while True:            
             iterations += 1
-            
-            if analyticalWeights: 
-                weights = torch.tensor(self.getWeights(data, pathways.detach().numpy()))
             loss = self.getLoss(data, pathways * mask, weights, reg = reg)
             
             # optimize the loss function with gradient descent
@@ -298,17 +284,66 @@ class CoordinatedModel:
         pathways = pathways.detach().numpy()
         weights = weights.detach().numpy()
         
-        self.loss = lossList
-        self.pathways = pathways
-        self.beta = np.sum(self.pathways, axis = 1, keepdims=True)
-        self.weights = weights
-        self.omega = tools.outer(self.pathways, self.weights).reshape(-1, 1)
-        self.conv = conv
+        
+        res['loss'] = lossList
+        res['pathways'] = pathways
+        res['beta'] = np.sum(pathways, axis = 1, keepdims=True)
+        res['weights'] = weights
+        res['omega'] = tools.outer(pathways, weights).reshape(-1, 1)
+        res['conv'] = conv
+        return res
+        
+    def initPathways(self, data, nullModel, additiveInit):
+        m = data.m
+        k = self.k
+        
+        # for anchor snps
+        mask = torch.ones(size = (m, k))
+        mask[-k:, :] = torch.eye(k)
+        
+        # initialization
+        weights = np.random.normal(0, 0.1, size = (k, k))
+        weights = np.tril(weights, -1) + np.tril(weights, -1).T
+            
+        pathways = np.random.normal(0, 0.1, size = (m, k))
+        pathways *= mask.detach().numpy()
+        weights = torch.tensor(weights, requires_grad = True)            
+        
+        if nullModel: weights = torch.zeros(k, k)
+        
+        if additiveInit:
+            lr = LinearRegression()
+            lr.fit(data.geno, data.pheno)
+            additive = lr.coef_.reshape(-1, 1)
+            pathways[:, -1:] = additive - pathways[:, :-1].sum(axis = 1, keepdims = True)
+            pathways[-k:, :] = np.diagflat(additive[-k:])
+            
+
+        pathways = torch.tensor(pathways, requires_grad = True)
+        
+        return weights, pathways, mask
+        
+    def fitModel(self, data, reg = 0, progress = False, nullModel = False, additiveInit = False):
+        minLoss = float('inf')
+        minLossRes = None
+        for restart in range(10):
+            res = self.gradDescent(data, reg, progress, nullModel, additiveInit)
+            if res['loss'][-1] < minLoss:
+                minLoss = res['loss'][-1]
+                minLossRes = res
+                
+        self.loss = minLossRes['loss']
+        self.pathways = minLossRes['pathways']
+        self.beta = minLossRes['beta']
+        self.weights = minLossRes['weights']
+        self.omega = minLossRes['omega']
+        self.conv = minLossRes['conv']
+            
         
     def getWeights(self, data, pathways, diag = True):
         G = data.geno
         Y = data.pheno
-        k = data.k
+        k = self.k
         
         beta = pathways.sum(axis = 1, keepdims = True)
         
@@ -352,7 +387,7 @@ class CoordinatedModel:
         return loss
     
     def evalPathwayAcc(self, data):
-        k = data.k
+        k = self.k
         withAnchors = tools.evalAcc(self.pathways, data.pathways)
         withoutAnchors = tools.evalAcc(self.pathways[:-k], data.pathways[:-k])
         return (withAnchors, withoutAnchors)
@@ -426,4 +461,23 @@ class UncoordinatedModel:
     def evalPhenoAcc(self, data):
         prediction = self.predictPheno(data)
         return stats.pearsonr(prediction.reshape(-1,), data.pheno.reshape(-1,))[0] ** 2
+    
+class Inference:
+    def likelihoodRatioTest(data):
+        k = data.k
+        coordinated = CoordinatedModel(k)
+        coordinated.fitModel(data, additiveInit = True)
+
+        null = AdditiveModel()
+        null.fitModel(data)
+
+        coordinated.predictPheno
+        coordinated_loss = coordinated.getLoss(data, coordinated.pathways, coordinated.weights, tensor = False)
+        null_loss = linalg.norm(data.pheno - data.geno @ null.beta) ** 2
+
+        sigma2 = np.var(data.pheno - coordinated.predictPheno(data))
+        stat = max(1/sigma2 * (null_loss - coordinated_loss), 0)
+        df = data.beta.shape[0] * (k - 1) + k * (k-1)/2 + k
         
+        pval = 1 - stats.chi2.cdf(stat, df = df)
+        return pval

@@ -24,20 +24,13 @@ with open(prefix + 'validation' + suffix + '.pkl', 'rb') as f:
 for param in training.keys():
     data = training[param]
     oos = validation[param]
-    min_loss = float('inf')
-    pathways = None
 
-    for restart in range(10):
-        coordinatedModel = CoordinatedModel()
-        coordinatedModel.fitModel(data)
-        loss = coordinatedModel.loss[-1]
-        if loss < min_loss:
-            min_loss = loss
-            pathways = coordinatedModel.pathways           
-            accPathways = coordinatedModel.evalPathwayAcc(data)
-            accPheno = coordinatedModel.evalPhenoAcc(oos)
-            accBeta = coordinatedModel.evalBetaAcc(data)
-            accOmega = coordinatedModel.evalOmegaAcc(data)
+    coordinatedModel = CoordinatedModel()
+    coordinatedModel.fitModel(data)
+    accPathways = coordinatedModel.evalPathwayAcc(data)
+    accPheno = coordinatedModel.evalPhenoAcc(oos)
+    accBeta = coordinatedModel.evalBetaAcc(data)
+    accOmega = coordinatedModel.evalOmegaAcc(data)
 
     res.append([param,
                 accPathways[0], 
