@@ -129,7 +129,7 @@ class RealDataset:
     def __init__(self, *args, **kwargs):
         infile = kwargs.get('infile', None)
         if infile:
-            df = pd.read_table(infile, sep = ' ')
+            df = pd.read_table(infile, sep = '\t')
             df = df[df['PHENOTYPE'] != -9]
             self.geno = df.iloc[:, 6:].to_numpy()
             self.pheno = df.iloc[:, 5].to_numpy().reshape(-1, 1)
