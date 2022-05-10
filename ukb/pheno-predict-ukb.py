@@ -13,8 +13,8 @@ import time
 
 PHENO_FILE=sys.argv[1]
 MODEL_FILE=sys.argv[2]
-IS_SELF_INTERACT=bool(sys.argv[3])
-IS_ANCHOR=bool(sys.argv[4])
+IS_SELF_INTERACT=sys.argv[3]=="True"
+IS_ANCHOR=sys.argv[4]=="True"
 N_RESTARTS=int(sys.argv[5])
 print(PHENO_FILE)
 print(MODEL_FILE)
