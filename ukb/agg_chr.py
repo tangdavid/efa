@@ -12,7 +12,6 @@ print(PREFIX)
 # TODO: make df
 
 df = pd.DataFrame()
-print(df)
 for i in range(2,22+1):
     if (exists(DIR+PREFIX+f"_chr{i}.raw")):
         chr_df = pd.read_csv(DIR+PREFIX+f"_chr{i}.raw", header=0, sep='\t', dtype=str)
@@ -20,6 +19,14 @@ for i in range(2,22+1):
             df = chr_df
         else:
             df = pd.merge(df, chr_df, on=['FID', 'IID', 'PAT', 'MAT', 'SEX', 'PHENOTYPE'])
-        print(df)
-            
+
+
+# set anchor snps to last 2 columns
+pheno = PREFIX[0:PREFIX.find('_')]
+if pheno == 'hba1c':
+    a1 = "rs7903146_T" # TCF7L2
+    a2 = "rs7185735_G" # FTO
+    df.insert(len(df.columns)-1, a1, df.pop(a1))
+    df.insert(len(df.columns)-1, a2, df.pop(a2))
+    
 df.to_csv(DIR+PREFIX+".raw", sep='\t', index=False)

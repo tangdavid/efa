@@ -5,8 +5,8 @@
 #PBS -l walltime=1:00:00
 #PBS -l nodes=1:ppn=1
 #PBS -l mem=4gb
-#PBS -o $HOME/epistasis_pheno$PBS_JOBID.out
-#PBS -e $HOME/epistasis_pheno$PBS_JOBID.err
+#PBS -o /gpfs/data/ukb-share/dahl/jerome/job_logs/epistasis_pheno$PBS_JOBID.out
+#PBS -e /gpfs/data/ukb-share/dahl/jerome/job_logs/epistasis_pheno$PBS_JOBID.err
 
 source /gpfs/data/ukb-share/dahl/jerome/my-base-env/bin/activate /gpfs/data/ukb-share/dahl/jerome/my-base-env/envs/epistasis
 
@@ -19,6 +19,12 @@ rows=50000
 # pheno_ids=(30750)
 # pheno_baskets=(29329)
 # snp_sets=("xue-t2d")
+echo $pheno_list
+echo $pheno_ids
+echo $pheno_baskets
+echo $snp_sets
+echo $n_snps
+
 pheno_list=(${pheno_list//;/ })
 pheno_ids=(${pheno_ids//;/ })
 pheno_baskets=(${pheno_baskets//;/ })
@@ -28,6 +34,8 @@ PC_num=10 # 0,10,20,30,40
 covariates="sab"
 #n_snps=(5 10 20 100)
 n_snps=(${n_snps//;/ })
+
+
 
 # paths
 PHENO_DIR="/gpfs/data/ukb-share/dahl/jerome/extracted_phenotypes"
@@ -42,7 +50,9 @@ CHR_AGG_SCRIPT="/gpfs/data/ukb-share/dahl/jerome/epistasis-factorization/ukb/agg
 
 # data
 #SAMPLES_FILE="${PHENO_DIR}/whitebritish_ids.txt"
-SAMPLES_FILE="${PHENO_DIR}/10000sample0.txt"
+#SAMPLES_FILE="${PHENO_DIR}/10000sample0.txt"
+#SAMPLES_FILE="${PHENO_DIR}/50k_unrelwb.txt"
+SAMPLES_FILE="${PHENO_DIR}/whitebritishunrelated_ids.txt"
 
 for i in ${!pheno_list[@]}; do
     echo "Running on ${pheno_list[$i]}..."
