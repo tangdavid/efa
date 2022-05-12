@@ -26,10 +26,6 @@ if __name__=="__main__":
     parser.add_argument('--anchor', default=False, action='store_true')
     parser.add_argument('--no-anchor', dest='anchor', action='store_false')
 
-    parser.add_argument('--permute', default=False, action='store_true')
-    parser.add_argument('--no-permute', dest='permute', action='store_false')
-
-
     args = parser.parse_args()
 
     PHENO_FILE=args.pheno
@@ -37,7 +33,6 @@ if __name__=="__main__":
     IS_SELF_INTERACT=args.self
     IS_ANCHOR=args.anchor
     N_RESTARTS=args.restarts
-    PERMUTE=args.permute
     K=args.k
 
     print("="*80)
@@ -47,9 +42,7 @@ if __name__=="__main__":
     print("number of restarts: %d" %N_RESTARTS)
     print("self interactions: %s" %str(IS_SELF_INTERACT))
     print("anchors: %s" %str(IS_ANCHOR))
-    if PERMUTE: print("using permuted phenotypes")
     print("="*80)
-    exit()
 
     start = time.time()
     print('Loading Data...')
@@ -57,7 +50,7 @@ if __name__=="__main__":
 
     print('Fitting Model...')
 
-    ce = CoordinatedModel(k = 2)
+    ce = CoordinatedModel(k = K)
     ce.fitModel(train, restarts=N_RESTARTS, selfInteractions=IS_SELF_INTERACT, anchors=IS_ANCHOR)
 
     with open(MODEL_FILE, 'wb') as f:
