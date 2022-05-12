@@ -1,5 +1,6 @@
 import pandas as pd
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold
 from tools import *
 
 class SimDataset:
@@ -128,16 +129,23 @@ class SimDataset:
 class RealDataset:
     def __init__(self, *args, **kwargs):
         infile = kwargs.get('infile', None)
+        delim = kwargs.get('delim', '\t')
         if infile:
-            df = pd.read_table(infile, sep = '\t')
+            df = pd.read_table(infile, sep = delim)
             df = df[df['PHENOTYPE'] != -9]
-            self.geno = df.iloc[:, 6:].to_numpy()
-            self.pheno = df.iloc[:, 5].to_numpy().reshape(-1, 1)
+            self.geno = self.standardize(df.iloc[:, 6:].to_numpy())
+            self.pheno = self.standardize(df.iloc[:, 5].to_numpy().reshape(-1, 1))
             self.n, self.m = self.geno.shape
         else:
-            self.geno = kwargs.get('geno')
-            self.pheno = kwargs.get('pheno')
+            self.geno = self.standardize(kwargs.get('geno'))
+            self.pheno = self.standardize(kwargs.get('pheno'))
             self.n, self.m = self.geno.shape
+            
+    def standardize(self, arr):
+        return (arr - arr.mean(axis = 0))/arr.std(axis = 0)
+    
+    def permute(self):
+        self.pheno = np.random.permutation(self.pheno)
 
 def splitTrain(data):
     train_G, test_G, train_Y, test_Y = train_test_split(data.geno, data.pheno, test_size=0.2)
@@ -145,9 +153,8 @@ def splitTrain(data):
     test = RealDataset(geno = test_G, pheno = test_Y)
     return(train, test)
 
-def splitKFold(data, folds = 10):
-    from sklearn.model_selection import KFold
-    kf = KFold(n_splits=folds, shuffle=True)
+def splitKFold(data, folds = 10, seed=None):
+    kf = KFold(n_splits=folds, shuffle=True, random_state=seed)
     kf.split(data.geno)
     
     res = list()
