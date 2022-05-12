@@ -12,6 +12,6 @@ source /gpfs/data/ukb-share/dahl/jerome/my-base-env/bin/activate /gpfs/data/ukb-
 
 cd /gpfs/data/ukb-share/dahl/jerome/epistasis-factorization/ukb
 
-echo "Fitting with $pheno_file $model_file $self_interact $anchor $n_restarts"
+echo "Fitting with $pheno_file $model_file $self_interact $anchor $n_restarts $seed $k $permute"
 
-python pheno-predict-ukb.py $pheno_file $model_file $self_interact $anchor $n_restarts
+python kfold_fit.py $pheno_file $model_file $self_interact $anchor $n_restarts $seed $k $permute

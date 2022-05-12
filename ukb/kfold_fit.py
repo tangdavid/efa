@@ -24,10 +24,6 @@ start = time.time()
 print('Loading Data...')
 data = RealDataset(infile = PHENO_FILE)
 
-if PERMUTE:
-    print('Using Permuted Data...')
-    data.permute()
-
 folds = splitKFold(data, folds=FOLDS, seed=SPLIT_SEED)
 
 ce_list=list()
@@ -40,6 +36,10 @@ ep_acc = list()
 print('Fitting Model...')
 for train, test in folds:
     print('Next fold...')
+
+    if PERMUTE:
+        print('Using Permuted Data...')
+        train.permute()
 
     ce = CoordinatedModel(k = 2)
     am = AdditiveModel()
