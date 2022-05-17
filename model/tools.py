@@ -51,11 +51,6 @@ class tools:
 
         return maxCorr
     
-    def generateOOS(data, n):
-        m, k, h2 = data.m, data.k, data.h2
-        res = Dataset(n, m, k = k, h2 = h2)
-        res.withEffectSizes(data)
-        return res    
     
     def likelihoodRatioTest(data):
         k = data.k
