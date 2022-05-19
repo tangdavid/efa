@@ -88,7 +88,7 @@ for i in ${!pheno_list[@]}; do
 		    
 		    /gpfs/data/ukb-share/plink2 \
 	    		--pfile ${GENO_DIR}/ukb_imp_chr${c}_v3 \
-	    		--extract ${snp_file} \
+	    		--extract range ${snp_file} \
 	    		--out ${PHENO_DIR}/epistasis_pheno/${pheno_list[$i]}_${snp_sets[$i]}_top${m}_chr${c} \
 	    		--pheno ${COVAR_DIR}/${pheno_list[$i]}${PC_num}.pheno \
 			--export A \
