@@ -16,17 +16,15 @@ MODEL_FILE=sys.argv[2]
 IS_SELF_INTERACT=sys.argv[3]=="True"
 IS_ANCHOR=sys.argv[4]=="True"
 N_RESTARTS=int(sys.argv[5])
-print(PHENO_FILE)
-print(MODEL_FILE)
-print(IS_SELF_INTERACT)
-print(IS_ANCHOR)
-print(N_RESTARTS)
+SPLIT_SEED=int(sys.argv[6])
+FOLDS=int(sys.argv[7])
+PERMUTE=sys.argv[8]=="True"
 
 start = time.time()
 print('Loading Data...')
 data = RealDataset(infile = PHENO_FILE)
 
-folds = splitKFold(data, folds=5)
+folds = splitKFold(data, folds=FOLDS, seed=SPLIT_SEED)
 
 ce_list=list()
 am_list=list()
@@ -38,6 +36,10 @@ ep_acc = list()
 print('Fitting Model...')
 for train, test in folds:
     print('Next fold...')
+
+    if PERMUTE:
+        print('Using Permuted Data...')
+        train.permute()
 
     ce = CoordinatedModel(k = 2)
     am = AdditiveModel()
