@@ -163,3 +163,9 @@ def splitKFold(data, folds = 10, seed=None):
         test = RealDataset(geno = data.geno[test_idx,], pheno = data.pheno[test_idx,])
         res.append((train, test))
     return res
+
+def generateOOS(data, n):
+    m, k, h2 = data.m, data.k, data.h2
+    res = SimDataset(n, m, k = k, h2 = h2)
+    res.withEffectSizes(data)
+    return res    
