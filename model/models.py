@@ -1,7 +1,41 @@
+from typing import overload
 from tools import *
 from sklearn.decomposition import PCA
-                
-class CoordinatedModel:
+from abc import ABC, abstractmethod
+            
+
+class Model(ABC):
+    def omegaPCA(self, k=2):
+        omega_mat = self.omega.reshape(self.m, self.m)
+        pca = PCA(n_components=k)
+        pca.fit(omega_mat)
+        self.pathways = pca.components_.T
+
+    def evalPathwayAcc(self, data):
+        k = data.k
+        withAnchors = tools.evalAcc(self.pathways, data.pathways)
+        withoutAnchors = tools.evalAcc(self.pathways[:-k], data.pathways[:-k])
+        return (withAnchors, withoutAnchors)
+    
+    def evalBetaAcc(self, data):
+        return stats.pearsonr(self.beta.reshape(-1,), data.beta.reshape(-1,))[0] ** 2
+    
+    def evalOmegaAcc(self, data):
+        return stats.pearsonr(self.omega.reshape(-1,), data.omega.reshape(-1,))[0] ** 2
+    
+    def evalPhenoAcc(self, data):
+        prediction = self.predictPheno(data)
+        return stats.pearsonr(prediction.reshape(-1,), data.pheno.reshape(-1,))[0] ** 2
+
+    @abstractmethod
+    def fitModel(self, data, *argv, **kwargs):
+        pass
+
+    @abstractmethod
+    def predictPheno(self, data):
+        pass
+
+class CoordinatedModel(Model):
     def __init__(self, k):
         self.k = k
         self.loss = None
@@ -97,26 +131,6 @@ class CoordinatedModel:
         
         return weights, pathways, mask
         
-    def fitModel(self, data, reg = 0, restarts = 10, progress = False, 
-                 nullModel = False, additiveInit = False, selfInteractions = True, anchors = True):
-        minLoss = float('inf')
-        minLossRes = None
-        for restart in range(restarts):
-            res = self.gradDescent(data, reg, progress, 
-                                   nullModel, additiveInit, selfInteractions, anchors)
-            if res['loss'][-1] < minLoss:
-                minLoss = res['loss'][-1]
-                minLossRes = res
-        
-        self.m = data.m
-        self.loss = minLossRes['loss']
-        self.pathways = minLossRes['pathways']
-        self.beta = minLossRes['beta']
-        self.weights = minLossRes['weights']
-        self.omega = minLossRes['omega']
-        self.conv = minLossRes['conv']
-            
-        
     def getWeights(self, data, pathways, diag = True):
         G = data.geno
         Y = data.pheno
@@ -160,28 +174,29 @@ class CoordinatedModel:
             loss = linalg.norm(Y - mainEffect - interEffect)**2 + penalty
         
         return loss
-    
-    def omegaPCA(self, k=2):
-        omega_mat = self.omega.reshape(self.m, self.m)
-        pca = PCA(n_components=k)
-        pca.fit(omega_mat)
-        self.pathways = pca.components_.T
 
-    def evalPathwayAcc(self, data):
-        k = self.k
-        withAnchors = tools.evalAcc(self.pathways, data.pathways)
-        withoutAnchors = tools.evalAcc(self.pathways[:-k], data.pathways[:-k])
-        return (withAnchors, withoutAnchors)
-    
-    def evalBetaAcc(self, data):
-        return stats.pearsonr(self.beta.reshape(-1,), data.beta.reshape(-1,))[0] ** 2
-    
-    def evalOmegaAcc(self, data):
-        return stats.pearsonr(self.omega.reshape(-1,), data.omega.reshape(-1,))[0] ** 2
-    
-    def evalPhenoAcc(self, data):
-        prediction = self.predictPheno(data)
-        return stats.pearsonr(prediction.reshape(-1,), data.pheno.reshape(-1,))[0] ** 2
+    def plotLoss(self):
+        plt.plot(self.loss)
+        plt.show()
+
+    def fitModel(self, data, reg = 0, restarts = 10, progress = False, 
+                 nullModel = False, additiveInit = False, selfInteractions = True, anchors = True):
+        minLoss = float('inf')
+        minLossRes = None
+        for restart in range(restarts):
+            res = self.gradDescent(data, reg, progress, 
+                                   nullModel, additiveInit, selfInteractions, anchors)
+            if res['loss'][-1] < minLoss:
+                minLoss = res['loss'][-1]
+                minLossRes = res
+        
+        self.m = data.m
+        self.loss = minLossRes['loss']
+        self.pathways = minLossRes['pathways']
+        self.beta = minLossRes['beta']
+        self.weights = minLossRes['weights']
+        self.omega = minLossRes['omega']
+        self.conv = minLossRes['conv']
     
     def predictPheno(self, data):
         G = data.geno
@@ -194,27 +209,25 @@ class CoordinatedModel:
         
         return mainEffect + interEffect
         
-    def plotLoss(self):
-        plt.plot(self.loss)
-        plt.show()
-        
-class AdditiveModel:
+class AdditiveModel(Model):
+    def evalOmegaAcc(self, data):
+        return None
+    
+    def evalPathwayAcc(self, data):
+        return (None, None)
+    
+    def omegaPCA(self, k):
+        pass
+    
     def fitModel(self, data):
         lr = LinearRegression()
         lr.fit(data.geno, data.pheno)
         self.beta = lr.coef_.reshape(-1, 1)
-        
+
     def predictPheno(self, data):
         return data.geno @ self.beta
-    
-    def evalBetaAcc(self, data):
-        return stats.pearsonr(self.beta.reshape(-1,), data.beta.reshape(-1,))[0] ** 2
-    
-    def evalPhenoAcc(self, data):
-        prediction = self.predictPheno(data)
-        return stats.pearsonr(prediction.reshape(-1,), data.pheno.reshape(-1,))[0] ** 2
 
-class UncoordinatedModel:
+class UncoordinatedModel(Model):
     def fitBeta(self, data):
         lr = LinearRegression()
         lr.fit(data.geno, data.pheno)
@@ -235,12 +248,6 @@ class UncoordinatedModel:
                 lr.fit(regressors, Y)
                 omega[idx] = lr.coef_.reshape(-1,)[0]
         self.omega = omega.reshape(-1, 1)
-
-    def omegaPCA(self, k=2):
-        omega_mat = self.omega.reshape(self.m, self.m)
-        pca = PCA(n_components=k)
-        pca.fit(omega_mat)
-        self.pathways = pca.components_.T
     
     def fitModel(self, data, random_effects = False):
         if random_effects:
@@ -256,38 +263,3 @@ class UncoordinatedModel:
     def predictPheno(self, data):
         inter = linalg.khatri_rao(data.geno.T, data.geno.T).T
         return data.geno @ self.beta + inter @ self.omega
-    
-    def evalOmegaAcc(self, data):
-        return stats.pearsonr(self.omega.reshape(-1,), data.omega.reshape(-1,))[0] ** 2
-    
-    def evalBetaAcc(self, data):
-        return stats.pearsonr(self.beta.reshape(-1,), data.beta.reshape(-1,))[0] ** 2
-    
-    def evalPhenoAcc(self, data):
-        prediction = self.predictPheno(data)
-        return stats.pearsonr(prediction.reshape(-1,), data.pheno.reshape(-1,))[0] ** 2
-
-    def evalPathwayAcc(self, data):
-        k = self.pathways.shape[1]
-        withAnchors = tools.evalAcc(self.pathways, data.pathways)
-        withoutAnchors = tools.evalAcc(self.pathways[:-k], data.pathways[:-k])
-        return (withAnchors, withoutAnchors)
-    
-class Inference:
-    def likelihoodRatioTest(data, k):
-        coordinated = CoordinatedModel(k)
-        coordinated.fitModel(data, additiveInit = True)
-
-        null = AdditiveModel()
-        null.fitModel(data)
-
-        coordinated.predictPheno
-        coordinated_loss = coordinated.getLoss(data, coordinated.pathways, coordinated.weights, tensor = False)
-        null_loss = linalg.norm(data.pheno - data.geno @ null.beta) ** 2
-
-        sigma2 = np.var(data.pheno - coordinated.predictPheno(data))
-        stat = max(1/sigma2 * (null_loss - coordinated_loss), 0)
-        df = data.beta.shape[0] * (k - 1) + k * (k-1)/2 + k
-        
-        pval = 1 - stats.chi2.cdf(stat, df = df)
-        return pval
