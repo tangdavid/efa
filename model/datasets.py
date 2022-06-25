@@ -1,7 +1,11 @@
 import pandas as pd
+import numpy as np
+
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import KFold
-from tools import *
+
+from scipy.linalg import khatri_rao, norm
+from tools import tools
 
 class SimDataset:
     def __init__(self, n, m, k = 2,
@@ -33,7 +37,7 @@ class SimDataset:
             geno.T[i] = (snps - (2*p))/np.sqrt(2*p*(1-p))
 
         # interaction effects as khatri rao
-        inter = linalg.khatri_rao(geno.T, geno.T).T
+        inter = khatri_rao(geno.T, geno.T).T
         self.geno, self.inter = geno, inter
 
     def simEffects(self):
@@ -48,8 +52,8 @@ class SimDataset:
         # add in anchor snps
         pathways[-k:, :] = np.eye(k)
         
-        norm_anchors = linalg.norm(pathways[-k:, :])
-        norm_others = linalg.norm(pathways[:-k, :])
+        norm_anchors = norm(pathways[-k:, :])
+        norm_others = norm(pathways[:-k, :])
 
         anchor_strength = self.anchor_strength
         scale_num = anchor_strength * norm_others
