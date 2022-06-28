@@ -1,9 +1,10 @@
 import sys
 sys.path.insert(0,'../model')
 
-from models import *
-from tools import *
-from datasets import *
+from models import UncoordinatedModel, CoordinatedModel, AdditiveModel
+from tools import tools
+from datasets import SimDataset
+import pickle as pkl
 import argparse
 import csv
 
@@ -16,7 +17,8 @@ def benchmark(model_name, prefix, suffix, model_k, true_k):
     with open(prefix + 'validation' + suffix + '.pkl', 'rb') as f:
         validation = pkl.load(f)
 
-    suffix = '_k%d%s' % (model_k, suffix)
+    if model_k != 0:
+        suffix = '_k%d%s' % (model_k, suffix)
 
     for param in training.keys():
         data = training[param]
@@ -24,44 +26,33 @@ def benchmark(model_name, prefix, suffix, model_k, true_k):
 
         if model_name == 'coordinated':
             model = CoordinatedModel(k = model_k)
-            model.fitModel(data)
-            accPheno = model.evalPhenoAcc(oos)
-            accBeta = model.evalBetaAcc(data)
-            accOmega = model.evalOmegaAcc(data)
-            if model_k == true_k: 
-                accPathways = model.evalPathwayAcc(data)
-                res.append([param, accPheno, accBeta, accOmega, accPathways[0], accPathways[1], model_k, repeat])
-            else:
-                res.append([param, accPheno, accBeta, accOmega, model_k, repeat])
+            model.fitModel(data, selfInteractions = False, anchors = False)
         elif model_name == 'coordinated_self':
             model = CoordinatedModel(k = model_k)
-            model.fitModel(data, selfInteractions = True)
-            accPheno = model.evalPhenoAcc(oos)
-            accBeta = model.evalBetaAcc(data)
-            accOmega = model.evalOmegaAcc(data)
-            if model_k == true_k: 
-                accPathways = model.evalPathwayAcc(data)
-                res.append([param, accPheno, accBeta, accOmega, accPathways[0], accPathways[1], model_k, repeat])
-            else:
-                res.append([param, accPheno, accBeta, accOmega, model_k, repeat])
+            model.fitModel(data, selfInteractions = True, anchors = True)
         elif model_name == 'uncoordinated':
             model = UncoordinatedModel()
-            model.fitModel(data)
-            accPheno = model.evalPhenoAcc(oos)
-            accBeta = model.evalBetaAcc(data)
-            accOmega = model.evalOmegaAcc(data)
-            res.append([param, accPheno, accBeta, accOmega, model_k, repeat])
+            model.fitModel(data, random_effects=False)
+        elif model_name == 'uncoordinated_random':
+            model = UncoordinatedModel()
+            model.fitModel(data, random_effects=True)
         elif model_name == 'additive':
             model = AdditiveModel()
             model.fitModel(data)
-            accPheno = model.evalPhenoAcc(oos)
-            accBeta = model.evalBetaAcc(data)
-            res.append([param, accPheno, accBeta, model_k, repeat])
         else:
             print('poorly specified model')
             exit()
+
+        accPheno = model.evalPhenoAcc(oos)
+        accBeta = model.evalBetaAcc(data)
+        accOmega = model.evalOmegaAcc(data)
+        if 'coordinated' not in model_name or model_k != true_k:
+            model.omegaPCA(k=true_k)
+        accPathways = model.evalPathwayAcc(data)
+        res.append([param, accPheno, accBeta, accOmega, accPathways[0], accPathways[1],  repeat])
                 
         print("done with param %0.1f" %param)
+        sys.stdout.flush()
             
     with open(prefix + model_name + suffix + '.csv', 'w') as csvfile:
         writer = csv.writer(csvfile)
@@ -79,7 +70,7 @@ if __name__=="__main__":
     model_k = args.kmodel
     true_k = args.ktrue
     repeat = args.repeat
-    prefix = './%s_k%d/' % (args.param, true_k)
+    prefix = './%s_k%d_self/' % (args.param, true_k)
     suffix = '_repeat%d' % (repeat)
     model_name = args.model
     benchmark(model_name, prefix, suffix, model_k, true_k) 
