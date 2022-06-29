@@ -233,10 +233,46 @@ class AdditiveModel(Model):
     def omegaPCA(self, k):
         pass
     
-    def fitModel(self, data):
-        lr = LinearRegression()
-        lr.fit(data.geno, data.pheno)
-        self.beta = lr.coef_.reshape(-1, 1)
+    def NLL(self, var, data):
+        G = data.geno
+        Y = data.pheno.reshape(-1,)
+        m = data.m
+        n = data.n
+        K = 1/m * G @ G.T
+        V = var[0] * K + var[1] * np.eye(n)
+        mu = np.zeros(n)
+        negloglike = -multivariate_normal.logpdf(Y, mu, V, allow_singular=True)
+        return negloglike
+
+    def fitMLE(self, data):
+        bounds = [(1e-6, None)] * 2
+        optim = minimize(self.NLL, [1, 1], data, bounds=bounds)    
+        return optim['x']
+    
+    def fitBLUP(self, data):
+        G = data.geno
+        Y = data.pheno
+        GG = khatri_rao(G.T, G.T).T
+        m_G = G.shape[1]
+        m_GG = GG.shape[1]
+        K = 1/m_G * G @ G.T
+        n = data.n
+
+        var = self.fitMLE(data)
+        V = var[0] * K + var[1] * np.eye(n)
+
+        beta = (var[0]/m_G * G).T @ np.linalg.inv(V) @ Y
+
+        return beta
+
+    def fitModel(self, data, random_effects=False):
+        if random_effects:
+            beta = self.fitBLUP(data)
+        else:
+            lr = LinearRegression()
+            lr.fit(data.geno, data.pheno)
+            beta = lr.coef_.reshape(-1, 1)
+        self.beta = beta
 
     def predictPheno(self, data):
         return data.geno @ self.beta
@@ -254,7 +290,7 @@ class UncoordinatedModel(Model):
         return negloglike
 
     def fitMLE(self, data):
-        bounds = [(1e-6, float('inf'))] * 3
+        bounds = [(1e-6, None)] * 3
         optim = minimize(self.NLL, [1, 1, 1], data, bounds=bounds)    
         return optim['x']
     

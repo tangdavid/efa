@@ -22,6 +22,8 @@ class SimDataset:
         self.self_interactions = self_interactions
         self.anchor_strength = anchor_strength
 
+        if self.additive_model_var == 0: self.additive_model_var = 1e-7
+        
         self.simGeno()
         self.simEffects()
         self.simPheno()
@@ -75,12 +77,13 @@ class SimDataset:
         omega = tools.outer(pathways, weights)
 
         # adding gaussian noise to additive and epistatic effects
-        #var_eomega = np.var(omega) * (self.noise_omega/ (1 - self.noise_omega)) 
+        # var_eomega = np.var(omega) * (self.noise_omega/ (1 - self.noise_omega)) 
         var_eomega = np.var(omega) * (self.noise_omega) 
         eomega = np.random.normal(0, 1, size = (m, m))
         eomega *= np.sqrt(var_eomega) / np.std(eomega)
         eomega = np.tril(eomega) + np.tril(eomega, -1).T
         weights *= np.sqrt((1 - self.noise_omega))
+        omega = tools.outer(pathways, weights)
         
         var_ebeta = np.var(beta) * (self.noise_beta/ (1 - self.noise_beta)) 
         ebeta = np.random.normal(0, np.sqrt(var_ebeta), m).reshape(-1, 1)
@@ -99,6 +102,7 @@ class SimDataset:
         self.beta = beta + ebeta
         self.omegaMat = omega + eomega
         self.omega = self.omegaMat.reshape(-1, 1)
+        self.eomega = eomega.reshape(-1, 1)
         self.weights = weights
         self.normalizePheno()
         
@@ -111,6 +115,7 @@ class SimDataset:
         self.weights *= scale
         self.beta /= scale
         self.omegaMat /= scale
+        self.eomega /= scale
         
     def withEffectSizes(self, data):
         self.pathways = data.pathways
