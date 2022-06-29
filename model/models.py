@@ -247,14 +247,20 @@ class AdditiveModel(Model):
     def fitMLE(self, data):
         bounds = [(1e-6, None)] * 2
         optim = minimize(self.NLL, [1, 1], data, bounds=bounds)    
+
+        G = data.geno
+        Y = data.pheno
+
+        self.var = optim['x']
+        self.G = G
+        self.Y = Y
+        
         return optim['x']
     
     def fitBLUP(self, data):
         G = data.geno
         Y = data.pheno
-        GG = khatri_rao(G.T, G.T).T
         m_G = G.shape[1]
-        m_GG = GG.shape[1]
         K = 1/m_G * G @ G.T
         n = data.n
 
@@ -275,7 +281,23 @@ class AdditiveModel(Model):
         self.beta = beta
 
     def predictPheno(self, data):
-        return data.geno @ self.beta
+        if hasattr(self, 'beta'):
+            return data.geno @ self.beta
+        if hasattr(self, 'var'):
+            return self.imputePheno(data)
+        else:
+            print('error: need to fit either effect sizes or var components')
+            return 
+    
+    def imputePheno(self, data):
+        Yin = self.Y
+        m = data.m
+        Kin = 1/m * self.G @ self.G.T
+        Kout = 1/m * data.geno @ self.G.T
+        var = self.var
+        Vin = var[0] * Kin + var[1] * np.eye(self.G.shape[0])
+        Vout = var[0] * Kout
+        return Vout @ np.linalg.inv(Vin) @ Yin
 
 class UncoordinatedModel(Model):
     def NLL(self, var, data):
@@ -292,6 +314,13 @@ class UncoordinatedModel(Model):
     def fitMLE(self, data):
         bounds = [(1e-6, None)] * 3
         optim = minimize(self.NLL, [1, 1, 1], data, bounds=bounds)    
+
+        G = data.geno
+        Y = data.pheno
+
+        self.var = optim['x']
+        self.G = G
+        self.Y = Y
         return optim['x']
     
     def fitBLUP(self, data):
@@ -344,5 +373,21 @@ class UncoordinatedModel(Model):
         self.n = data.n
         
     def predictPheno(self, data):
-        inter = khatri_rao(data.geno.T, data.geno.T).T
-        return data.geno @ self.beta + inter @ self.omega
+        if hasattr(self, 'beta') and hasattr(self, 'omega'):
+            inter = khatri_rao(data.geno.T, data.geno.T).T
+            return data.geno @ self.beta + inter @ self.omega
+        if hasattr(self, 'var'):
+            return self.imputePheno(data)
+        else:
+            print('error: need to fit either effect sizes or var components')
+            return 
+    
+    def imputePheno(self, data):
+        Yin = self.Y
+        m = data.m
+        Kin = 1/m * self.G @ self.G.T
+        Kout = 1/m * data.geno @ self.G.T
+        var = self.var
+        Vin = var[0] * Kin + var[1] * Kin * Kin + var[2] * np.eye(self.G.shape[0])
+        Vout = var[0] * Kout + var[1] * Kout * Kout
+        return Vout @ np.linalg.inv(Vin) @ Yin
