@@ -25,8 +25,7 @@ def main():
     res = np.zeros((10, 12))
     cols = ['pheno',
             'ide', 'ce2', 'ce3', 'ce4',
-            'adr', 'adf',
-            'epf', 'epr',
+            'adr', 'adf', 'epf', 'epr',
             'adr_raw', 'epr_raw',
             'fold']
 
@@ -34,9 +33,9 @@ def main():
     sys.stdout.flush()
     for fold in range(10):
         train_file = f'{dataset}/folds/train{fold}.csv'
-        subprocess.call(['bash', './clump.sh', pheno, train_file])
-        train = RealDataset(f'{dataset}/input/train{pheno}.raw')
-        test = RealDataset(f'{dataset}/input/test{pheno}.raw')
+        subprocess.call(['bash', './clump.sh', str(pheno), train_file, dataset])
+        train = RealDataset(infile = f'{dataset}/input/train{pheno}.raw', delim=' ')
+        test = RealDataset(infile = f'{dataset}/input/val{pheno}.raw', delim=' ')
         
         ide = CoordinatedModel(k = 2)
         ce2 = CoordinatedModel(k = 2)
