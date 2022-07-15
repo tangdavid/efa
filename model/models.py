@@ -1,4 +1,5 @@
 from tools import *
+from sklearn.decomposition import PCA
                 
 class CoordinatedModel:
     def __init__(self, k):
@@ -12,9 +13,6 @@ class CoordinatedModel:
                     nullModel, additiveInit, selfInteractions, anchors):
         m = data.m
         k = self.k
-
-        G = torch.tensor(data.geno, requires_grad = False).double()
-        Y = torch.tensor(data.pheno, requires_grad = False).double()
 
         tol = 1e-7
         res = dict()
@@ -109,7 +107,8 @@ class CoordinatedModel:
             if res['loss'][-1] < minLoss:
                 minLoss = res['loss'][-1]
                 minLossRes = res
-                
+        
+        self.m = data.m
         self.loss = minLossRes['loss']
         self.pathways = minLossRes['pathways']
         self.beta = minLossRes['beta']
@@ -162,6 +161,12 @@ class CoordinatedModel:
         
         return loss
     
+    def omegaPCA(self, k=2):
+        omega_mat = self.omega.reshape(self.m, self.m)
+        pca = PCA(n_components=k)
+        pca.fit(omega_mat)
+        self.pathways = pca.components_.T
+
     def evalPathwayAcc(self, data):
         k = self.k
         withAnchors = tools.evalAcc(self.pathways, data.pathways)
@@ -230,10 +235,23 @@ class UncoordinatedModel:
                 lr.fit(regressors, Y)
                 omega[idx] = lr.coef_.reshape(-1,)[0]
         self.omega = omega.reshape(-1, 1)
+
+    def omegaPCA(self, k=2):
+        omega_mat = self.omega.reshape(self.m, self.m)
+        pca = PCA(n_components=k)
+        pca.fit(omega_mat)
+        self.pathways = pca.components_.T
     
-    def fitModel(self, data):
-        self.fitBeta(data)
-        self.fitOmega(data)
+    def fitModel(self, data, random_effects = False):
+        if random_effects:
+            beta, omega, _ = randomEffects.aiML(data)
+            self.beta = beta
+            self.omega = omega
+        else:
+            self.fitBeta(data)
+            self.fitOmega(data)
+        self.m = data.m
+        self.n = data.n
         
     def predictPheno(self, data):
         inter = linalg.khatri_rao(data.geno.T, data.geno.T).T
@@ -248,6 +266,12 @@ class UncoordinatedModel:
     def evalPhenoAcc(self, data):
         prediction = self.predictPheno(data)
         return stats.pearsonr(prediction.reshape(-1,), data.pheno.reshape(-1,))[0] ** 2
+
+    def evalPathwayAcc(self, data):
+        k = self.pathways.shape[1]
+        withAnchors = tools.evalAcc(self.pathways, data.pathways)
+        withoutAnchors = tools.evalAcc(self.pathways[:-k], data.pathways[:-k])
+        return (withAnchors, withoutAnchors)
     
 class Inference:
     def likelihoodRatioTest(data, k):

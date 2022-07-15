@@ -12,7 +12,7 @@ print(PREFIX)
 # TODO: make df
 
 df = pd.DataFrame()
-for i in range(2,22+1):
+for i in range(1,22+1):
     if (exists(DIR+PREFIX+f"_chr{i}.raw")):
         chr_df = pd.read_csv(DIR+PREFIX+f"_chr{i}.raw", header=0, sep='\t', dtype=str)
         if df.empty:

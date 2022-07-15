@@ -34,11 +34,8 @@ snp_sets="sinarm-urate-range"
 #pheno_ids="30850-0.0"
 #pheno_baskets="29329"
 #snp_sets="sinarm-femaletest-range"
-
-
-
-
 #n_snps="6;10;20;100"
+
 n_snps="100"
 n_permutations=1000
 split_seed=42
