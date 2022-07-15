@@ -22,6 +22,7 @@ PERMUTE=sys.argv[8]=="True"
 
 start = time.time()
 print('Loading Data...')
+sys.stdout.flush()
 data = RealDataset(infile = PHENO_FILE)
 
 folds = splitKFold(data, folds=FOLDS, seed=SPLIT_SEED)
@@ -34,12 +35,16 @@ am_acc = list()
 ep_acc = list()
 
 print('Fitting Model...')
+sys.stdout.flush()
 for train, test in folds:
     print('Next fold...')
+    sys.stdout.flush()
 
     if PERMUTE:
         print('Using Permuted Data...')
+        sys.stdout.flush()
         train.permute()
+        test.permute()
 
     ce = CoordinatedModel(k = 2)
     am = AdditiveModel()
@@ -52,6 +57,7 @@ for train, test in folds:
     ce_list.append(ce)
     am_list.append(am)
     ep_list.append(ep)
+
     ce_acc.append(ce.evalPhenoAcc(test))
     am_acc.append(am.evalPhenoAcc(test))
     ep_acc.append(ep.evalPhenoAcc(test))
@@ -72,3 +78,4 @@ with open(MODEL_FILE, 'wb') as f:
 end = time.time()
 print('Done!')
 print('Time: %f' % (end - start))
+sys.stdout.flush()

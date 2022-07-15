@@ -2,15 +2,44 @@
 
 source /gpfs/data/ukb-share/dahl/jerome/my-base-env/bin/activate /gpfs/data/ukb-share/dahl/jerome/my-base-env/envs/epistasis
 
-cd /gpfs/data/ukb-share/dahl/jerome/epistasis-factorization/ukb
+cd /gpfs/data/ukb-share/dahl/davidtang/epistasis-factorization/ukb
 
 PHENO_DIR="/gpfs/data/ukb-share/dahl/jerome/extracted_phenotypes/epistasis_pheno"
-pheno_list="hba1c"
-pheno_ids="30750"
+# hba1c
+# pheno_list="hba1c"
+# pheno_ids="30750"
+# pheno_baskets="29329"
+# snp_sets="xue-t2d"
+
+# urate
+pheno_list="urate"
+pheno_ids="30880-0.0"
 pheno_baskets="29329"
-snp_sets="xue-t2d"
+snp_sets="sinarm-urate-range"
+
+# igf-1
+#pheno_list="igf1"
+#pheno_ids="30770-0.0"
+#pheno_baskets="29329"
+#snp_sets="sinarm-igf1-range"
+
+# male testosterone
+#pheno_list="male_testosterone"
+#pheno_ids="30850-0.0"
+#pheno_baskets="29329"
+#snp_sets="sinarm-maletest-range"
+
+# female testosterone
+#pheno_list="female_testosterone"
+#pheno_ids="30850-0.0"
+#pheno_baskets="29329"
+#snp_sets="sinarm-femaletest-range"
+
+
+
+
 #n_snps="6;10;20;100"
-n_snps="20"
+n_snps="100"
 n_permutations=1000
 split_seed=42
 folds=2
@@ -20,10 +49,10 @@ restarts=20
 n_snps_list=(${n_snps//;/ })
 pheno_list_iter=(${pheno_list//;/ })
 # run gen-plink-raw here, pass args -> use qsub -W depend=afterok:$pheno_job -v ...
-#echo "Submitting pheno job..."
-#pheno_job=$( qsub -v pheno_list=$pheno_list,pheno_ids=$pheno_ids,pheno_baskets=$pheno_baskets,snp_sets=$snp_sets,n_snps=$n_snps gen-plink-raw.sh )
-#echo "Submitted"
-#sleep 2
+# echo "Submitting pheno job..."
+# pheno_job=$( qsub -v pheno_list=$pheno_list,pheno_ids=$pheno_ids,pheno_baskets=$pheno_baskets,snp_sets=$snp_sets,n_snps=$n_snps gen-plink-raw.sh )
+# echo "Submitted"
+# sleep 10
 
 for i in ${!pheno_list_iter[@]}; do
     for m in ${n_snps_list[@]}; do
