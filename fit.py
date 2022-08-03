@@ -3,12 +3,12 @@ sys.path.insert(0, './model/')
 
 
 import pandas as pd
-from tools import *
 from datasets import RealDataset
 from datasets import splitTrain, splitKFold
 from models import CoordinatedModel, AdditiveModel, UncoordinatedModel
 import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
+import pickle as pkl
 import time
 import argparse
 
@@ -51,7 +51,7 @@ if __name__=="__main__":
     print('Fitting Model...')
 
     ce = CoordinatedModel(k = K)
-    ce.fitModel(train, restarts=N_RESTARTS, selfInteractions=IS_SELF_INTERACT, anchors=IS_ANCHOR)
+    ce.fitModel(data, restarts=N_RESTARTS, selfInteractions=IS_SELF_INTERACT, anchors=IS_ANCHOR)
 
     with open(MODEL_FILE, 'wb') as f:
         pkl.dump(ce, f)
