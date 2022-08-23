@@ -5,6 +5,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.model_selection import KFold
 
 from scipy.linalg import khatri_rao, norm
+from scipy import stats
 from tools import tools
 
 class SimDataset:
@@ -136,7 +137,7 @@ class SimDataset:
 
 
 class RealDataset:
-    def __init__(self, *args, **kwargs):
+    def __init__(self, rint = False, *args, **kwargs):
         infile = kwargs.get('infile', None)
         delim = kwargs.get('delim', '\t')
         if infile:
@@ -149,9 +150,16 @@ class RealDataset:
             self.geno = self.standardize(kwargs.get('geno'))
             self.pheno = self.standardize(kwargs.get('pheno'))
             self.n, self.m = self.geno.shape
+        if rint: self.pheno = self.rint(self.pheno)
             
     def standardize(self, arr):
         return (arr - arr.mean(axis = 0))/arr.std(axis = 0)
+
+    def rint(self, arr):
+        order = arr.argsort(axis=0)
+        ranks = order.argsort(axis = 0)
+        arr_rint = stats.norm.ppf((ranks+0.5)/arr.shape[0])
+        return(arr_rint)
     
     def permute(self):
         self.pheno = np.random.permutation(self.pheno)
