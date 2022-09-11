@@ -9,9 +9,19 @@ from scipy import stats
 from tools import tools
 
 class SimDataset:
-    def __init__(self, n, m, k = 2,
-                 h2 = 0.7, noise_beta = 0, noise_omega = 0, additive_model_var = 0.5,
-                 sparse = 0, self_interactions = True, anchor_strength = 0.5):
+    def __init__(
+        self, n, m, 
+        k = 2, 
+        h2 = 0.7, 
+        noise_beta = 0, 
+        noise_omega = 0, 
+        additive_model_var = 0.5,
+        sparse = 0, 
+        self_interactions = True, 
+        anchor_strength = 0.5, 
+        dominance = False
+        ):
+
         self.n = n
         self.m = m
         self.k = k
@@ -22,6 +32,7 @@ class SimDataset:
         self.additive_model_var = additive_model_var
         self.self_interactions = self_interactions
         self.anchor_strength = anchor_strength
+        self.dominance = dominance
 
         if self.additive_model_var == 0: self.additive_model_var = 1e-7
         
@@ -80,7 +91,11 @@ class SimDataset:
         # adding gaussian noise to additive and epistatic effects
         # var_eomega = np.var(omega) * (self.noise_omega/ (1 - self.noise_omega)) 
         var_eomega = np.var(omega) * (self.noise_omega) 
-        eomega = np.random.normal(0, 1, size = (m, m))
+        if self.dominance:
+            eomega = np.diag(np.random.normal(0, 1, size = m))
+        else:
+            eomega = np.random.normal(0, 1, size = (m, m))
+            
         eomega *= np.sqrt(var_eomega) / np.std(eomega)
         eomega = np.tril(eomega) + np.tril(eomega, -1).T
         weights *= np.sqrt((1 - self.noise_omega))
