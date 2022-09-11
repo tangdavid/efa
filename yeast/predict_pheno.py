@@ -3,12 +3,11 @@ sys.path.insert(0,'../model')
 
 from models import UncoordinatedModel, CoordinatedModel, AdditiveModel
 import numpy as np
-from tools import tools
+import pandas as pd
 from datasets import RealDataset
-from datasets import splitTrain, splitKFold
-import pickle as pkl
+from datasets import splitKFold
 import argparse
-import csv
+import subprocess
 
 def main():
     parser = argparse.ArgumentParser()
@@ -16,28 +15,28 @@ def main():
     parser.add_argument("dataset", help="which dataset", type=str)
     args = parser.parse_args()
 
-    print("datset: %s" %args.dataset)
+    dataset = args.dataset
+    pheno = args.pheno
+
+    print("dataset: %s" %args.dataset)
     print("pheno: %d" %args.pheno)
     sys.stdout.flush()
-
-    data = RealDataset(infile = '%s/input/pheno%d.raw' % (args.dataset, args.pheno), delim=' ')
-    folds = splitKFold(data, folds=10, seed=42)
     
-    ide_acc = list()
-    ce2_acc = list()
-    ce3_acc = list()
-    ce4_acc = list()
-    adr_acc = list()
-    adf_acc = list()
-    epf_acc = list()
-    epr_acc = list()
-    adr_raw_acc = list()
-    epr_raw_acc = list()
+    res = np.zeros((10, 12))
+    cols = ['pheno',
+            'ide', 'ce2', 'ce3', 'ce4',
+            'adr', 'adf', 'epf', 'epr',
+            'adr_raw', 'epr_raw',
+            'fold']
 
-    i = 0
     print('clumped data')
     sys.stdout.flush()
-    for train, test in folds:
+    for fold in range(10):
+        train_file = f'{dataset}/folds/train{fold}.csv'
+        subprocess.call(['bash', './clump.sh', str(pheno), train_file, dataset])
+        train = RealDataset(infile = f'{dataset}/input/train{pheno}.raw', delim=' ')
+        test = RealDataset(infile = f'{dataset}/input/val{pheno}.raw', delim=' ')
+        
         ide = CoordinatedModel(k = 2)
         ce2 = CoordinatedModel(k = 2)
         ce3 = CoordinatedModel(k = 3)
@@ -56,17 +55,17 @@ def main():
         epf.fitModel(train)
         epr.fitModel(train, random_effects=True)
 
-        ide_acc.append(ide.evalPhenoAcc(test))
-        ce2_acc.append(ce2.evalPhenoAcc(test))
-        ce3_acc.append(ce3.evalPhenoAcc(test))
-        ce4_acc.append(ce4.evalPhenoAcc(test))
-        adf_acc.append(adf.evalPhenoAcc(test))
-        adr_acc.append(adr.evalPhenoAcc(test))
-        epf_acc.append(epf.evalPhenoAcc(test))
-        epr_acc.append(epr.evalPhenoAcc(test))
-
-        i += 1
-        print("done with fold %d" %i)
+        res[fold][0] = pheno
+        res[fold][1] = ide.evalPhenoAcc(test)
+        res[fold][2] = ce2.evalPhenoAcc(test)
+        res[fold][3] = ce3.evalPhenoAcc(test)
+        res[fold][4] = ce4.evalPhenoAcc(test)
+        res[fold][5] = adf.evalPhenoAcc(test)
+        res[fold][6] = adr.evalPhenoAcc(test)
+        res[fold][7] = epf.evalPhenoAcc(test)
+        res[fold][8] = epr.evalPhenoAcc(test)
+        
+        print("done with fold %d" % fold)
         sys.stdout.flush()
 
     print('raw data')
@@ -74,6 +73,7 @@ def main():
 
     data = RealDataset(infile = '%s/raw/pheno%d.raw' % (args.dataset, args.pheno), delim=' ')
     folds = splitKFold(data, folds=10, seed=42)
+    fold = 0
     for train, test in folds:
         adr = AdditiveModel()
         epr = UncoordinatedModel()
@@ -81,28 +81,16 @@ def main():
         adr.fitMLE(train)
         epr.fitMLE(train)
 
-        adr_raw_acc.append(adr.evalPhenoAcc(test))
-        epr_raw_acc.append(epr.evalPhenoAcc(test))
+        res[fold][9] =adr.evalPhenoAcc(test)
+        res[fold][10] =epr.evalPhenoAcc(test)
+        res[fold][11] = fold
 
-        i += 1
-        print("done with fold %d" %i)
+        fold += 1
+        print("done with fold %d" %fold)
         sys.stdout.flush()
-   
-    res = (args.pheno, 
-           np.mean(ide_acc), np.std(ide_acc)/np.sqrt(10),
-           np.mean(ce2_acc), np.std(ce2_acc)/np.sqrt(10),
-           np.mean(ce3_acc), np.std(ce3_acc)/np.sqrt(10),
-           np.mean(ce4_acc), np.std(ce4_acc)/np.sqrt(10),
-           np.mean(adf_acc), np.std(adf_acc)/np.sqrt(10),
-           np.mean(adr_acc), np.std(adr_acc)/np.sqrt(10),
-           np.mean(epf_acc), np.std(epf_acc)/np.sqrt(10),
-           np.mean(epr_acc), np.std(epr_acc)/np.sqrt(10),
-           np.mean(adr_raw_acc), np.std(adr_raw_acc)/np.sqrt(10),
-           np.mean(epr_raw_acc), np.std(epr_raw_acc)/np.sqrt(10))
 
-    with open('%s/output/pheno%d.csv' % (args.dataset, args.pheno), 'w') as csvfile:
-        writer = csv.writer(csvfile)
-        writer.writerow(res)
+    outfile = '%s/output/pheno%d.csv' % (dataset, pheno)
+    pd.DataFrame(data=res, columns=cols).to_csv(outfile, index=None)
 
 if __name__=='__main__':
     main()
