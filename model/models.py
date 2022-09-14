@@ -182,6 +182,7 @@ class CoordinatedModel(Model):
             penalty = reg * torch.sum(torch.abs(pathways))
             loss = torch.norm(Y - mainEffect - interEffect)**2 + penalty
         else:
+            GU = G @ pathways
             interEffect = khatri_rao(GU.T, GU.T).T @ weights.reshape(-1, 1)
             mainEffect = np.sum(G @ pathways, axis=1, keepdims=True)
             penalty = reg * np.sum(np.abs(pathways))

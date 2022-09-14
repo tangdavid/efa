@@ -3,6 +3,7 @@ import numpy as np
 
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import KFold
+from sklearn.linear_model import LinearRegression
 
 from scipy.linalg import khatri_rao, norm
 from scipy import stats
@@ -152,7 +153,11 @@ class SimDataset:
         self.pheno = mean + noise
 
     def permute(self):
-        self.pheno = np.random.permutation(self.pheno)
+        lr = LinearRegression()
+        lr.fit(self.geno, self.pheno)
+        res = self.pheno - lr.predict(self.geno)
+        res = np.random.permutation(res)
+        self.pheno = lr.predict(self.geno) + res
 
 
 class SimDatasetLD:
@@ -202,7 +207,11 @@ class RealDataset:
         return(arr_rint)
     
     def permute(self):
-        self.pheno = np.random.permutation(self.pheno)
+        lr = LinearRegression()
+        lr.fit(self.geno, self.pheno)
+        res = self.pheno - lr.predict(self.geno)
+        res = np.random.permutation(res)
+        self.pheno = lr.predict(self.geno) + res
 
 def splitTrain(data):
     train_G, test_G, train_Y, test_Y = train_test_split(data.geno, data.pheno, test_size=0.2)
