@@ -156,7 +156,8 @@ class SimDataset:
         lr = LinearRegression()
         lr.fit(self.geno, self.pheno)
         res = self.pheno - lr.predict(self.geno)
-        self.pheno = np.random.permutation(lr.predict(self.geno)) + res
+        res = np.random.permutation(res)
+        self.pheno = lr.predict(self.geno) + res
 
 
 
@@ -210,7 +211,8 @@ class RealDataset:
         lr = LinearRegression()
         lr.fit(self.geno, self.pheno)
         res = self.pheno - lr.predict(self.geno)
-        self.pheno = np.random.permutation(lr.predict(self.geno)) + res
+        res = np.random.permutation(res)
+        self.pheno = lr.predict(self.geno) + res
 
 def splitTrain(data):
     train_G, test_G, train_Y, test_Y = train_test_split(data.geno, data.pheno, test_size=0.2)
