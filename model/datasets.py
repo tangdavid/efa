@@ -19,7 +19,8 @@ class SimDataset:
         sparse = 0, 
         self_interactions = True, 
         anchor_strength = 0.5, 
-        dominance = False
+        dominance = False,
+        store_inter = True
         ):
 
         self.n = n
@@ -39,6 +40,7 @@ class SimDataset:
         self.simGeno()
         self.simEffects()
         self.simPheno()
+        if not store_inter: del self.inter
 
     def simGeno(self):
         # genotypes are iid binom(2, p) where p normal
@@ -151,6 +153,28 @@ class SimDataset:
 
     def permute(self):
         self.pheno = np.random.permutation(self.pheno)
+
+
+class SimDatasetLD:
+    def __init__(self, r2 = 0):
+        pass
+
+    def simLD(self, r2):
+        r = np.sqrt(r2)
+        cov = np.zeros(
+            [[1, r, r],
+             [r, 1, 0],
+             [r, 0, 1]]
+        )
+        geno = np.random.multivariate_normal(mean = np.zeros(3), cov=cov, size = (self.n, self.m//2))
+        geno = np.hstack(np.swapaxes(geno, 0, 1))
+        causal = geno[:, ::3]
+        geno = np.delete(geno, range(0, self.m + self.m // 2, 3), axis = 1)
+
+        effects = np.random.normal(loc = 0)
+
+        pass
+
 
 class RealDataset:
     def __init__(self, rint = False, *args, **kwargs):
