@@ -95,7 +95,7 @@ class SimDataset:
             eomega = np.diag(np.random.normal(0, 1, size = m))
         else:
             eomega = np.random.normal(0, 1, size = (m, m))
-            
+
         eomega *= np.sqrt(var_eomega) / np.std(eomega)
         eomega = np.tril(eomega) + np.tril(eomega, -1).T
         weights *= np.sqrt((1 - self.noise_omega))
@@ -122,7 +122,6 @@ class SimDataset:
         self.weights = weights
         self.normalizePheno()
         
-    
     def normalizePheno(self):
         # normalize phenotypes to variance 1
         std_mean = np.std(self.inter @ self.omega + self.geno @ self.beta)
@@ -150,6 +149,8 @@ class SimDataset:
         noise = np.random.normal(0, eps_std, self.n).reshape(-1, 1)
         self.pheno = mean + noise
 
+    def permute(self):
+        self.pheno = np.random.permutation(self.pheno)
 
 class RealDataset:
     def __init__(self, rint = False, *args, **kwargs):
