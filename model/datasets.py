@@ -152,14 +152,11 @@ class SimDataset:
         noise = np.random.normal(0, eps_std, self.n).reshape(-1, 1)
         self.pheno = mean + noise
 
-    def permute(self):
-        lr = LinearRegression()
-        lr.fit(self.geno, self.pheno)
-        res = self.pheno - lr.predict(self.geno)
-        res = np.random.permutation(res)
-        self.pheno = lr.predict(self.geno) + res
-
-
+    def permute(self, residualize=None):
+        if residualize is None: residualize = np.zeros((self.n, 1))
+        residuals = self.pheno - residualize
+        residuals = np.random.permutation(residuals)
+        self.pheno = residuals + residualize
 
 class SimDatasetLD:
     def __init__(self, r2 = 0):
@@ -181,6 +178,52 @@ class SimDatasetLD:
 
         pass
 
+class SimDatasetAdditive:
+    def __init__(self, n, m, h2 = 0.5):
+        self.inter = None
+        self.n = n
+        self.m = m
+        self.h2 = h2
+        self.simGeno()
+        self.simEffects()
+        self.simPheno()
+        pass
+
+    def simGeno(self):
+        geno = np.zeros([self.n, self.m])
+        for i in range(self.m):
+            p = np.random.beta(2, 2)
+            p = max(p, 0.05)
+            p = min(p, 0.95)
+            snps = np.random.binomial(2, p, self.n)
+            geno.T[i] = (snps - (2*p))/np.sqrt(2*p*(1-p))
+
+        geno -= np.mean(geno, axis = 0)
+        geno /= np.std(geno, axis = 0)
+        self.geno = geno
+
+    def simEffects(self):
+        self.beta = np.random.normal(0, 1, (self.m, 1))
+
+    def simPheno(self):
+        std_mean = np.std(self.geno @ self.beta)
+        scale = std_mean / np.sqrt(self.h2)
+        self.beta /= scale
+        eps_std = np.sqrt(1 - self.h2)
+        noise = np.random.normal(0, eps_std, self.n).reshape(-1, 1)
+        self.pheno = self.geno @ self.beta + noise
+
+    def permute(self, residualize=None):
+        if residualize is None: residualize = np.zeros((self.n, 1))
+        residuals = self.pheno - residualize
+        residuals = np.random.permutation(residuals)
+        self.pheno = residuals + residualize
+
+    def withEffectSizes(self, data):
+        self.beta = data.beta
+        eps_std = np.sqrt(1 - self.h2)
+        noise = np.random.normal(0, eps_std, self.n).reshape(-1, 1)
+        self.pheno = self.geno @ self.beta + noise
 
 class RealDataset:
     def __init__(self, rint = False, *args, **kwargs):
@@ -207,12 +250,11 @@ class RealDataset:
         arr_rint = stats.norm.ppf((ranks+0.5)/arr.shape[0])
         return(arr_rint)
     
-    def permute(self):
-        lr = LinearRegression()
-        lr.fit(self.geno, self.pheno)
-        res = self.pheno - lr.predict(self.geno)
-        res = np.random.permutation(res)
-        self.pheno = lr.predict(self.geno) + res
+    def permute(self, residualize=None):
+        if residualize is None: residualize = np.zeros((self.n, 1))
+        residuals = self.pheno - residualize
+        residuals = np.random.permutation(residuals)
+        self.pheno = residuals + residualize
 
 def splitTrain(data):
     train_G, test_G, train_Y, test_Y = train_test_split(data.geno, data.pheno, test_size=0.2)
@@ -232,7 +274,18 @@ def splitKFold(data, folds = 10, seed=None):
     return res
 
 def generateOOS(data, n):
-    m, k, h2 = data.m, data.k, data.h2
-    res = SimDataset(n, m, k = k, h2 = h2)
-    res.withEffectSizes(data)
+    if isinstance(data, SimDataset):
+        m, k, h2 = data.m, data.k, data.h2
+        res = SimDataset(n, m, k = k, h2 = h2)
+        res.withEffectSizes(data)
+    elif isinstance(data, SimDatasetAdditive):
+        m, h2 = data.m, data.h2
+        res = SimDatasetAdditive(n, m, h2 = h2)
+        res.withEffectSizes(data)
     return res    
+
+def concatDatasets(data1, data2):
+    G = np.vstack((data1.geno, data2.geno))
+    Y = np.vstack((data1.pheno, data2.pheno))
+    return RealDataset(geno = G, pheno = Y)
+    
