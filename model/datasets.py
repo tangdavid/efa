@@ -50,8 +50,13 @@ class SimDataset:
         geno = np.zeros([self.n, self.m])
         for i in range(self.m):
             p = np.random.beta(2, 2)
+            p = max(p, 0.05)
+            p = min(p, 0.95)
             snps = np.random.binomial(2, p, self.n)
             geno.T[i] = (snps - (2*p))/np.sqrt(2*p*(1-p))
+
+        geno -= np.mean(geno, axis = 0)
+        geno /= np.std(geno, axis = 0)
 
         # interaction effects as khatri rao
         inter = khatri_rao(geno.T, geno.T).T
@@ -288,4 +293,3 @@ def concatDatasets(data1, data2):
     G = np.vstack((data1.geno, data2.geno))
     Y = np.vstack((data1.pheno, data2.pheno))
     return RealDataset(geno = G, pheno = Y)
-    
