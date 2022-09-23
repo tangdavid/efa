@@ -164,12 +164,16 @@ class SimDataset:
         self.pheno = residuals + residualize
 
 class SimDatasetLD:
-    def __init__(self, r2 = 0):
-        pass
+    def __init__(self, n, m, r2 = 0, h2 = 0.5):
+        self.n = n
+        self.m = m
+        self.r2 = r2
+        self.h2 = h2
+        self.simEffects()
 
-    def simLD(self, r2):
-        r = np.sqrt(r2)
-        cov = np.zeros(
+    def simEffects(self):
+        r = np.sqrt(self.r2)
+        cov = np.array(
             [[1, r, r],
              [r, 1, 0],
              [r, 0, 1]]
@@ -178,10 +182,24 @@ class SimDatasetLD:
         geno = np.hstack(np.swapaxes(geno, 0, 1))
         causal = geno[:, ::3]
         geno = np.delete(geno, range(0, self.m + self.m // 2, 3), axis = 1)
+        beta = np.random.normal(size = (self.m // 2, 1))
+        additive_effect = causal @ beta
+        beta *= np.sqrt(self.h2)/np.std(additive_effect)
+        additive_effect = causal @ beta
 
-        effects = np.random.normal(loc = 0)
+        epsilon = np.random.normal(size = (self.n, 1))
+        epsilon *= np.sqrt(1 - self.h2)/ np.std(epsilon)
 
-        pass
+        self.causal = causal
+        self.beta = beta
+        self.pheno = additive_effect + epsilon
+        self.geno = geno
+
+    def withEffectSizes(self, data):
+        self.beta = data.beta
+        eps_std = np.sqrt(1 - self.h2)
+        epsilon = np.random.normal(0, eps_std, self.n).reshape(-1, 1)
+        self.pheno = self.causal @ self.beta + epsilon
 
 class SimDatasetAdditive:
     def __init__(self, n, m, h2 = 0.5):
@@ -287,6 +305,12 @@ def generateOOS(data, n):
         m, h2 = data.m, data.h2
         res = SimDatasetAdditive(n, m, h2 = h2)
         res.withEffectSizes(data)
+
+    elif isinstance(data, SimDatasetLD):
+        m, r2, h2 = data.m, data.r2, data.h2
+        res = SimDatasetLD(n, m, r2 = r2, h2 = h2)
+        res.withEffectSizes(data)
+
     return res    
 
 def concatDatasets(data1, data2):
