@@ -44,9 +44,6 @@ class SimDataset:
         if not store_inter: del self.inter
 
     def simGeno(self):
-        # genotypes are iid binom(2, p) where p normal
-        # genotypes are scaled and centered
-
         geno = np.zeros([self.n, self.m])
         for i in range(self.m):
             p = np.random.beta(2, 2)
@@ -97,7 +94,6 @@ class SimDataset:
         omega = tools.outer(pathways, weights)
 
         # adding gaussian noise to additive and epistatic effects
-        # var_eomega = np.var(omega) * (self.noise_omega/ (1 - self.noise_omega)) 
         var_eomega = np.var(omega) * (self.noise_omega) 
         if self.dominance:
             eomega = np.diag(np.random.normal(0, 1, size = m))
@@ -131,7 +127,6 @@ class SimDataset:
         self.normalizePheno()
         
     def normalizePheno(self):
-        # normalize phenotypes to variance 1
         std_mean = np.std(self.inter @ self.omega + self.geno @ self.beta)
         scale = std_mean / np.sqrt(self.h2)
         self.pathways /= scale
@@ -178,7 +173,11 @@ class SimDatasetLD:
              [r, 1, 0],
              [r, 0, 1]]
         )
-        geno = np.random.multivariate_normal(mean = np.zeros(3), cov=cov, size = (self.n, self.m//2))
+        geno = np.random.multivariate_normal(
+            mean = np.zeros(3),
+            cov=cov, 
+            size = (self.n, self.m//2)
+        )
         geno = np.hstack(np.swapaxes(geno, 0, 1))
         causal = geno[:, ::3]
         geno = np.delete(geno, range(0, self.m + self.m // 2, 3), axis = 1)
@@ -255,14 +254,19 @@ class RealDataset:
         if infile:
             df = pd.read_table(infile, sep = delim)
             df = df[df['PHENOTYPE'] != -9]
-            self.geno = self.standardize(df.iloc[:, 6:].to_numpy())
-            self.pheno = self.standardize(df.iloc[:, 5].to_numpy().reshape(-1, 1))
-            self.n, self.m = self.geno.shape
+            geno = self.standardize(df.iloc[:, 6:].to_numpy())
+            pheno = self.standardize(df.iloc[:, 5].to_numpy().reshape(-1, 1))
+            n, m = geno.shape
         else:
-            self.geno = self.standardize(kwargs.get('geno'))
-            self.pheno = self.standardize(kwargs.get('pheno'))
-            self.n, self.m = self.geno.shape
-        if rint: self.pheno = self.rint(self.pheno)
+            geno = self.standardize(kwargs.get('geno'))
+            pheno = self.standardize(kwargs.get('pheno'))
+            n, m = geno.shape
+        if rint: pheno = self.rint(pheno)
+
+        self.geno = geno
+        self.pheno = pheno
+        self.n = n
+        self.m = m
             
     def standardize(self, arr):
         return (arr - arr.mean(axis = 0))/arr.std(axis = 0)
@@ -280,7 +284,8 @@ class RealDataset:
         self.pheno = residuals + residualize
 
 def splitTrain(data):
-    train_G, test_G, train_Y, test_Y = train_test_split(data.geno, data.pheno, test_size=0.2)
+    res = train_test_split(data.geno, data.pheno, test_size=0.2)
+    train_G, test_G, train_Y, test_Y = res
     train = RealDataset(geno = train_G, pheno = train_Y)
     test = RealDataset(geno = test_G, pheno = test_Y)
     return(train, test)
@@ -291,8 +296,14 @@ def splitKFold(data, folds = 10, seed=None):
     
     res = list()
     for train_idx, test_idx in kf.split(data.geno):
-        train = RealDataset(geno = data.geno[train_idx,], pheno = data.pheno[train_idx,])
-        test = RealDataset(geno = data.geno[test_idx,], pheno = data.pheno[test_idx,])
+        train = RealDataset(
+            geno = data.geno[train_idx,], 
+            pheno = data.pheno[train_idx,]
+        )
+        test = RealDataset(
+            geno = data.geno[test_idx,], 
+            pheno = data.pheno[test_idx,]
+        )
         res.append((train, test))
     return res
 
