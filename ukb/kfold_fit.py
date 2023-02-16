@@ -52,7 +52,15 @@ for train, test in folds:
     am = AdditiveModel()
     ep = UncoordinatedModel()
     
-    ce.fitModel(train, restarts=N_RESTARTS, self_interactions=IS_SELF_INTERACT, anchors=IS_ANCHOR)
+    ce.fitModel(
+        train, 
+        algo=ALGO,
+        restarts=N_RESTARTS, 
+        additive_init=True,
+        self_interactions=IS_SELF_INTERACT, 
+        anchors=IS_ANCHOR,
+        sink=SINK
+    )
     am.fitModel(train)
     ep.fitModel(train)
 
