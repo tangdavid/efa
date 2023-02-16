@@ -26,13 +26,24 @@ if __name__=="__main__":
     parser.add_argument('--anchor', default=False, action='store_true')
     parser.add_argument('--no-anchor', dest='anchor', action='store_false')
 
+    parser.add_argument('--permute', default=False, action='store_true')
+    parser.add_argument('--no-permute', dest='permute', action='store_false')
+
+    parser.add_argument('--sink', default=False, action='store_true')
+    parser.add_argument('--no-sink', dest='sink', action='store_false')
+
+    parser.add_argument("--algo", default="coord", type=str)
+
     args = parser.parse_args()
 
     PHENO_FILE=args.pheno
     MODEL_FILE=args.out
     IS_SELF_INTERACT=args.self
     IS_ANCHOR=args.anchor
+    IS_PERMUTE=args.permute
     N_RESTARTS=args.restarts
+    SINK=args.sink
+    ALGO=args.algo
     K=args.k
 
     print("="*80)
@@ -42,19 +53,33 @@ if __name__=="__main__":
     print("number of restarts: %d" %N_RESTARTS)
     print("self interactions: %s" %str(IS_SELF_INTERACT))
     print("anchors: %s" %str(IS_ANCHOR))
+    print("permuted data: %s" %str(IS_PERMUTE))
     print("="*80)
+    sys.stdout.flush()
 
     start = time.time()
-    print('Loading Data...')
+    print('Loading Data...', flush=True)
     data = RealDataset(infile = PHENO_FILE)
+    if IS_PERMUTE: data.permute()
 
-    print('Fitting Model...')
+    print('Fitting Model...',flush=True)
 
-    ce = CoordinatedModel(k = K)
-    ce.fitModel(data, restarts=N_RESTARTS, selfInteractions=IS_SELF_INTERACT, anchors=IS_ANCHOR)
+    efa = CoordinatedModel(k = K)
+    efa.fitModel(
+        data, 
+        algo=ALGO,
+        restarts=N_RESTARTS, 
+        additive_init=True,
+        self_interactions=IS_SELF_INTERACT, 
+        anchors=IS_ANCHOR,
+        sink=SINK
+    )
+    add = AdditiveModel()
+    add.fitModel(data)
 
     with open(MODEL_FILE, 'wb') as f:
-        pkl.dump(ce, f)
+        pkl.dump(efa, f)
+        pkl.dump(add, f)
 
     end = time.time()
     print('Done!')

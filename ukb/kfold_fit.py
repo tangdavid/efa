@@ -10,6 +10,7 @@ from models import CoordinatedModel, AdditiveModel, UncoordinatedModel
 import matplotlib.pyplot as plt
 from matplotlib.cm import ScalarMappable
 import time
+import pickle as pkl
 
 PHENO_FILE=sys.argv[1]
 MODEL_FILE=sys.argv[2]
@@ -19,10 +20,16 @@ N_RESTARTS=int(sys.argv[5])
 SPLIT_SEED=int(sys.argv[6])
 FOLDS=int(sys.argv[7])
 PERMUTE=sys.argv[8]=="True"
+RINT=sys.argv[9]=="True"
+SINK=sys.argv[10]=="True"
+ALGO=sys.argv[11]
 
 start = time.time()
-print('Loading Data...')
-data = RealDataset(infile = PHENO_FILE)
+print('Loading Data...', flush=True)
+data = RealDataset(infile = PHENO_FILE, rint=RINT)
+add_full = AdditiveModel()
+add_full.fitModel(data)
+
 
 folds = splitKFold(data, folds=FOLDS, seed=SPLIT_SEED)
 
@@ -45,7 +52,7 @@ for train, test in folds:
     am = AdditiveModel()
     ep = UncoordinatedModel()
     
-    ce.fitModel(train, restarts=N_RESTARTS, selfInteractions=IS_SELF_INTERACT, anchors=IS_ANCHOR)
+    ce.fitModel(train, restarts=N_RESTARTS, self_interactions=IS_SELF_INTERACT, anchors=IS_ANCHOR)
     am.fitModel(train)
     ep.fitModel(train)
 

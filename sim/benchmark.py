@@ -26,10 +26,10 @@ def benchmark(model_name, prefix, suffix, model_k, true_k):
 
         if model_name == 'coordinated':
             model = CoordinatedModel(k = model_k)
-            model.fitModel(data, selfInteractions = False, anchors = False)
+            model.fitModel(data, self_interactions = False, anchors = False)
         elif model_name == 'coordinated_self':
             model = CoordinatedModel(k = model_k)
-            model.fitModel(data, selfInteractions = True, anchors = True)
+            model.fitModel(data, self_interactions = True, anchors = True)
         elif model_name == 'uncoordinated':
             model = UncoordinatedModel()
             model.fitModel(data, random_effects=False)

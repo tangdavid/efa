@@ -14,7 +14,7 @@ class tools:
             for j in range(k):
                 if i == skip or j == skip:
                     continue
-                    
+                
                 u = mat[:, i]
                 v = mat[:, j]
                 ret += weights[i, j] * matType.outer(u, v)

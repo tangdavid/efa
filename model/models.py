@@ -3,7 +3,6 @@ from tools import tools
 from sklearn.decomposition import PCA
 from sklearn.linear_model import LinearRegression
 
-
 from scipy.stats import pearsonr
 from scipy.stats import multivariate_normal
 from scipy.optimize import minimize
@@ -50,42 +49,63 @@ class Model(ABC):
         pass
 
 class CoordinatedModel(Model):
-    def __init__(self, k):
-        self.k = k
+    def __init__(self, k, sink = False):
+        self.k = k if not sink else k + 1
+        self.sink = sink
         self.loss = None
         self.conv = True
         self.pathways = None
         self.weights = None
 
-    def gradDescent(self, data, reg, progress,
-                    nullModel, additiveInit, selfInteractions, anchors):
+        weights_mask = np.ones((self.k, self.k))
+        if sink:
+            weights_mask[:,-1] = 0
+            weights_mask[-1,:] = 0
+        self.weights_mask = weights_mask
+
+
+    def gradDescent(self, data, args):
+        additive_init = args.get('additive_init', True)
+        init_noise = args.get('init_noise', 0.1)
+        self_interactions = args.get('self_interactions', False)
+        anchors = args.get('anchors', None)
+        progress = args.get('progress', False)
+
         m = data.m
         k = self.k
 
         tol = 1e-7
-        res = dict()
-        
-        weights, pathways, pathways_mask = self.initPathways(data, nullModel, additiveInit)
+
+        # for anchor snps
+        pathways_mask = torch.ones(size = (m, k))
+        if anchors:
+            pathways_mask[-k:, :] = torch.eye(k)
+
+        weights, pathways = self.initPathways(data, additive_init, init_noise)
+        weights = torch.tensor(weights, requires_grad = True)
+        pathways = torch.tensor(pathways, requires_grad = True)
         
         # use Adam to optimize 
-        params = [pathways] if nullModel else [weights, pathways]
+        params = [weights, pathways]
         optimizer = optim.Adam(params)
+
         prevLoss = currentLoss = self.getLoss(data, pathways, weights).item()
-        
         lossList = [currentLoss]
         iterations = 0
 
         conv = True
         
         weights_mask = torch.ones(size = (k, k))
-        if not selfInteractions: weights_mask = weights_mask - torch.eye(k)
-            
-        if not anchors: pathways_mask = torch.ones(size = (m, k))
+        if not self_interactions: weights_mask = weights_mask - torch.eye(k)
         
         while True:            
             iterations += 1
             
-            loss = self.getLoss(data, pathways * pathways_mask, weights * weights_mask, reg = reg)
+            loss = self.getLoss(
+                data, 
+                pathways*pathways_mask, 
+                weights*weights_mask
+            )
             
             # optimize the loss function with gradient descent
             optimizer.zero_grad()
@@ -97,16 +117,19 @@ class CoordinatedModel(Model):
             currentLoss = loss.item()
             lossList.append(currentLoss)
             
-            if np.abs(currentLoss - prevLoss)/prevLoss < tol and iterations > 1: break
+            if np.abs(currentLoss - prevLoss)/prevLoss < tol and iterations > 1:
+                 break
             if iterations % 1000 == 0 and progress: 
                 print("(iterations,loss):", iterations, round(loss.item(), 3))
                 
-            if iterations > 15000: break
+            if iterations > 15000: 
+                conv = False
+                break
 
         pathways = pathways.detach().numpy()
         weights = weights.detach().numpy()
         
-        
+        res = dict()
         res['loss'] = lossList
         res['pathways'] = pathways
         res['beta'] = np.sum(pathways, axis = 1, keepdims=True)
@@ -114,36 +137,127 @@ class CoordinatedModel(Model):
         res['omega'] = tools.outer(pathways, weights).reshape(-1, 1)
         res['conv'] = conv
         return res
-        
-    def initPathways(self, data, nullModel, additiveInit):
-        m = data.m
+
+    def coordDescent(self, data, args):
+        G = data.geno
+        Y = data.pheno
         k = self.k
         
-        # for anchor snps
-        mask = torch.ones(size = (m, k))
-        mask[-k:, :] = torch.eye(k)
+        tol = 1e-7
+        additive_init = args.get('additive_init', True)
+        init_noise = args.get('init_noise', 0.1)
+        progress = args.get('progress', False)
+                
+        # initialize pathways and weights
+        weights, pathways = self.initPathways(data, additive_init, init_noise)    
+
+        iterations = 0
+        currentLoss = self.getLoss(data, pathways, weights, tensor = False)
+        prevLoss = currentLoss
+        lossList = [currentLoss]
+        conv = True
         
-        # initialization
-        weights = np.random.normal(0, 0.1, size = (k, k))
-        weights = np.tril(weights, -1) + np.tril(weights, -1).T
+        while(True):
+            # iteratively update each pathway
+            for i in range(k):
+                # compute constants
+                pathway_mask = [True] * k
+                pathway_mask[i] = False
+                weights_mask = np.ones_like(weights)
+                weights_mask[i,:] = 0
+                weights_mask[:,i] = 0
+                weights_mask *= self.weights_mask
+                np.fill_diagonal(weights_mask, 0)
+
+                X = khatri_rao((G @ pathways).T, (G @ pathways).T).T
+                C1 = X @ (weights * weights_mask).reshape(-1, 1)
+                C2 = G @ pathways[:,pathway_mask].sum(axis=1, keepdims=True) 
+                C = C1 + C2
+
+                A = G @ pathways @ weights[i].reshape(-1, 1)
+                
+                # equations from the first order conditions
+                B1 = (4*G.T @ (A*A*G)) + (4*G.T @ (A*G)) + (G.T @ G)
+                B2 = (2*(A*G).T @ Y) + (G.T @ Y) - (2*(A*G).T @ C) - (G.T @ C)
+                ui = np.linalg.solve(B1, B2)
+                pathways[:, i] = ui.reshape(-1,)
+                
+                
+            # iteratively fit weights
+            for i in range(k):
+                if i == k-1 and self.sink: continue
+                for j in range(i):
+                    
+                    ui = pathways[:,i]
+                    uj = pathways[:,j]
+
+                    weights_mask = np.ones_like(weights)
+                    weights_mask[i,j] = 0
+                    weights_mask[j,i] = 0
+                    np.fill_diagonal(weights_mask, 0)
+                    weights_mask *= self.weights_mask
+                    
+                    # compute constants
+                    pair = ((G @ ui)*(G @ uj)).reshape(-1, 1)
+                    X = khatri_rao((G @ pathways).T, (G @ pathways).T).T
+                    C1 = X @ (weights * weights_mask).reshape(-1, 1)
+                    C2 = G @ pathways.sum(axis=1, keepdims=True) 
+                    C = C1 + C2
+                    
+                    # equation from the first order conditions
+                    weight = 1/2 * (pair.T @ (Y - C))/(pair.T @ pair)
+                    weights[i, j] = weight
+                    weights[j, i] = weight    
+
+            # zero out sink pathway if we are fitting it
+            weights *= self.weights_mask
+            # monitor convergence
+            iterations += 1
+            prevLoss = currentLoss
+            currentLoss = self.getLoss(data, pathways, weights, tensor = False)
+            lossList.append(currentLoss)
             
-        pathways = np.random.normal(0, 0.1, size = (m, k))
-        pathways *= mask.detach().numpy()
-        weights = torch.tensor(weights, requires_grad = True)            
-        
-        if nullModel: weights = torch.zeros(k, k)
-        
-        if additiveInit:
+            if np.abs(currentLoss - prevLoss)/prevLoss < tol and iterations > 1:
+                 break
+
+            if iterations % 1000 == 0 and progress: 
+                print("(iterations,loss):", iterations, round(currentLoss, 3))
+
+            if iterations > 15000:
+                conv = False
+                break
+
+        res = dict()    
+        res['loss'] = lossList
+        res['pathways'] = pathways
+        res['beta'] = np.sum(pathways, axis = 1, keepdims=True)
+        res['weights'] = weights
+        res['omega'] = tools.outer(pathways, weights).reshape(-1, 1)
+        res['conv'] = conv
+        return res
+
+    def initPathways(
+        self, 
+        data, 
+        additive_init,
+        init_noise = 0.1,
+    ):
+        m = data.m
+        k = self.k
+
+        pathways = np.zeros((m, k))
+        if additive_init:
             lr = LinearRegression()
             lr.fit(data.geno, data.pheno)
-            additive = lr.coef_.reshape(-1, 1)
-            pathways[:, -1:] = additive - pathways[:, :-1].sum(axis = 1, keepdims = True)
-            pathways[-k:, :] = np.diagflat(additive[-k:])
-            
+            additive = lr.coef_.reshape(-1,)
+            for i in range(k):
+                pathways[:, i] = additive/k
 
-        pathways = torch.tensor(pathways, requires_grad = True)
         
-        return weights, pathways, mask
+        weights = np.random.normal(0, init_noise, size = (k, k))
+        weights = np.tril(weights, -1) + np.tril(weights, -1).T    
+        pathways += np.random.normal(0, init_noise, size = (m, k))
+        return weights, pathways
         
     def getWeights(self, data, pathways, diag = True):
         G = data.geno
@@ -170,23 +284,20 @@ class CoordinatedModel(Model):
         weights = weights + np.tril(weights, -1).T
         return weights
 
-    def getLoss(self, data, pathways, weights, reg = 0, tensor = True):
+    def getLoss(self, data, pathways, weights, tensor = True):
         G = torch.tensor(data.geno).double() if tensor else data.geno
         Y = torch.tensor(data.pheno).double() if tensor else data.pheno
-        n = data.n
 
         if tensor:
             GU = G @ pathways
             interEffect = tools.face_splitting(GU, GU) @ weights.view(-1, 1)
             mainEffect = torch.sum(G @ pathways, dim=1, keepdims=True)
-            penalty = reg * torch.sum(torch.abs(pathways))
-            loss = torch.norm(Y - mainEffect - interEffect)**2 + penalty
+            loss = torch.norm(Y - mainEffect - interEffect)**2
         else:
             GU = G @ pathways
             interEffect = khatri_rao(GU.T, GU.T).T @ weights.reshape(-1, 1)
             mainEffect = np.sum(G @ pathways, axis=1, keepdims=True)
-            penalty = reg * np.sum(np.abs(pathways))
-            loss = norm(Y - mainEffect - interEffect)**2 + penalty
+            loss = norm(Y - mainEffect - interEffect)**2
         
         return loss
 
@@ -194,13 +305,23 @@ class CoordinatedModel(Model):
         plt.plot(self.loss)
         plt.show()
 
-    def fitModel(self, data, reg = 0, restarts = 10, progress = False, 
-                 nullModel = False, additiveInit = False, selfInteractions = True, anchors = True):
+    def fitModel(self, data, **kwargs):
+
+        restarts = kwargs.get('restarts', 10)
+        algo = kwargs.get('algo', 'coord')
+
         minLoss = float('inf')
         minLossRes = None
+
         for restart in range(restarts):
-            res = self.gradDescent(data, reg, progress, 
-                                   nullModel, additiveInit, selfInteractions, anchors)
+            if algo == 'grad':
+                res = self.gradDescent(data, kwargs)
+            elif algo == 'coord':
+                res = self.coordDescent(data, kwargs)
+            else:
+                print('error: algorithm must be either grad or coord')
+                return -1
+
             if res['loss'][-1] < minLoss:
                 minLoss = res['loss'][-1]
                 minLossRes = res
