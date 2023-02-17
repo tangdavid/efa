@@ -207,7 +207,6 @@ class SimDatasetLD:
         residuals = np.random.permutation(residuals)
         self.pheno = residuals + residualize
 
-
 class SimDatasetAdditive:
     def __init__(self, n, m, h2 = 0.5):
         self.inter = None

@@ -70,7 +70,7 @@ if __name__=="__main__":
     model_k = args.kmodel
     true_k = args.ktrue
     repeat = args.repeat
-    prefix = './%s_k%d_self/' % (args.param, true_k)
+    prefix = './%s_k%d/' % (args.param, true_k)
     suffix = '_repeat%d' % (repeat)
     model_name = args.model
     benchmark(model_name, prefix, suffix, model_k, true_k) 

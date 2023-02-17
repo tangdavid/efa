@@ -42,7 +42,14 @@ if __name__=="__main__":
     #else:
     #    param_list = np.linspace(0.1, 1, 10).round(1)
     
-    param_list = np.linspace(0, 1, 11).round(1)
+    if args.param == 'snp':
+        param_list = np.array([5, 10, 20, 50, 100, 500])
+    elif args.param == 'N':
+        param_list = np.array([100, 500, 1000, 5000, 10000, 50000, 100000])
+        param_list = np.array([100, 500, 1000, 5000, 10000])
+    else:
+        param_list = np.linspace(0, 1, 11).round(1)
+    
 
     for param in param_list:
         p=1e-8 if param==0 else param
@@ -52,8 +59,14 @@ if __name__=="__main__":
             data[param] = SimDataset(N, 20, k=k, h2=p, self_interactions=self)
         elif args.param == 'additive_var':
             data[param] = SimDataset(N, 20, k=k, h2=0.5, additive_model_var=p, self_interactions=self)
+        elif args.param == 'dominance':
+            data[param] = SimDataset(N, 20, k=k, h2=0.5, additive_model_var=p, noise_omega=1, dominance=True, self_interactions=self)
         elif args.param == 'anchor_strength':
             data[param] = SimDataset(N, 20, k=k, h2=0.5, anchor_strength=p, self_interactions=self)
+        elif args.param == 'snp':
+            data[param] = SimDataset(N, p, k=k, h2=0.5, self_interactions=self)
+        elif args.param == 'N':
+            data[param] = SimDataset(p, 20, k=k, h2=0.5, self_interactions=self)
         else: 
             print('poorly specified parameter')
             exit()
