@@ -160,6 +160,7 @@ class SimDataset:
 
 class SimDatasetLD:
     def __init__(self, n, m, r2 = 0, h2 = 0.5):
+        self.inter = None
         self.n = n
         self.m = m
         self.r2 = r2
@@ -199,6 +200,13 @@ class SimDatasetLD:
         eps_std = np.sqrt(1 - self.h2)
         epsilon = np.random.normal(0, eps_std, self.n).reshape(-1, 1)
         self.pheno = self.causal @ self.beta + epsilon
+
+    def permute(self, residualize=None):
+        if residualize is None: residualize = np.zeros((self.n, 1))
+        residuals = self.pheno - residualize
+        residuals = np.random.permutation(residuals)
+        self.pheno = residuals + residualize
+
 
 class SimDatasetAdditive:
     def __init__(self, n, m, h2 = 0.5):
