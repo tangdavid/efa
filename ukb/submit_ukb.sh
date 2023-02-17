@@ -2,69 +2,41 @@
 
 source /gpfs/data/ukb-share/dahl/jerome/my-base-env/bin/activate /gpfs/data/ukb-share/dahl/jerome/my-base-env/envs/epistasis
 
-cd /gpfs/data/ukb-share/dahl/jerome/epistasis-factorization/ukb
+cd /gpfs/data/ukb-share/dahl/davidtang/epistasis-factorization/ukb
 
 PHENO_DIR="/gpfs/data/ukb-share/dahl/jerome/extracted_phenotypes/epistasis_pheno"
-# hba1c
-# pheno_list="hba1c"
-# pheno_ids="30750"
-# pheno_baskets="29329"
-# snp_sets="xue-t2d"
-# urate
-pheno_list="urate"
-pheno_ids="30880-0.0"
-pheno_baskets="29329"
-snp_sets="sinarm-urate-range"
 
-#n_snps="6;10;20;100"
-n_snps="100"
+export pheno="male_testosterone"
+export snps="sinarm-maletest-range"
+export n_snps="100"
+export seed=42
+export folds=2
+export n_restarts=20
+export rint='False'
+export sink='False'
+export algo='coord'
+export self_interact='False'
+export anchor='False'
+export pheno_file="${PHENO_DIR}/${pheno}_${snps}_top${n_snps}.raw"
+
 n_permutations=1000
-split_seed=42
-folds=2
-restarts=20
 
+echo "Submitting unpermuted..."
+model_file="pkl/${pheno}_${snps}_top${n_snps}_baseline.pkl"
+qsub -V -v permute=False,model_file=${model_file} fit_ukb.sh \
+    -o ./job-out/${pheno}.out \
+    -e ./job-out/${pheno}.err \
+    -N ${pheno}
+sleep 0.5
 
-n_snps_list=(${n_snps//;/ })
-pheno_list_iter=(${pheno_list//;/ })
-# run gen-plink-raw here, pass args -> use qsub -W depend=afterok:$pheno_job -v ...
-# echo "Submitting pheno job..."
-# pheno_job=$( qsub -v pheno_list=$pheno_list,pheno_ids=$pheno_ids,pheno_baskets=$pheno_baskets,snp_sets=$snp_sets,n_snps=$n_snps gen-plink-raw.sh )
-# echo "Submitted"
-# sleep 10
+mkdir -p "pkl/permutations/${pheno}_${snps}_top${n_snps}_baseline"
 
-for i in ${!pheno_list_iter[@]}; do
-    for m in ${n_snps_list[@]}; do
-	pheno_file="${PHENO_DIR}/${pheno_list[$i]}_${snp_sets[$i]}_top${m}.raw"
-	
-	model_file="pkl/${pheno_list[$i]}_${snp_sets[$i]}_top${m}_baseline.pkl"
-	if [ ! -f $model_file ]; then
-	    echo "Submitting ${model_file}..."
-	    qsub -v pheno_file=$pheno_file,model_file=$model_file,self_interact=False,anchor=False,n_restarts=$restarts,seed=$split_seed,k=$folds,permute=False fit_ukb.sh
-	    sleep 2
-	fi
-
-	for p in $(seq 0 $n_permutations); do
-	    mkdir -p "pkl/permutations/${pheno_list[$i]}_${snp_sets[$i]}_top${m}_baseline"
-	    p_file="pkl/permutations/${pheno_list[$i]}_${snp_sets[$i]}_top${m}_baseline/perm${p}.pkl" 
-	    if [ ! -f $p_file ]; then
-		echo "Submitting permutation..."
-		qsub -v pheno_file=$pheno_file,model_file=$p_file,self_interact=False,anchor=False,n_restarts=$restarts,seed=$split_seed,k=$folds,permute=True fit_ukb.sh
-		sleep 2
-	    fi
-	done
-	
-	# model_file="pkl/${pheno_list[$i]}_${snp_sets[$i]}_top${m}_anchor_selfinteract.pkl"
-	# if [ ! -f $model_file ]; then
-        #     echo "Submitting ${model_file}..."
-        #     qsub -v pheno_file=$pheno_file,model_file=$model_file,self_interact=True,anchor=True,n_restarts=$restarts,seed=$split_seed,k=$folds,permute=False fit_ukb.sh
-        #     sleep 2
-        # fi
-        
-	# model_file="pkl/${pheno_list[$i]}_${snp_sets[$i]}_top${m}_anchor.pkl"
-	# if [ ! -f $model_file ]; then
-        #     echo "Submitting ${model_file}..."
-        #     qsub -v pheno_file=$pheno_file,model_file=$model_file,self_interact=False,anchor=True,n_restarts=$restarts,seed=$split_seed,k=$folds,permute=False fit_ukb.sh
-        #     sleep 2
-        # fi
-    done
+for p in $(seq 1 $n_permutations); do
+    model_file="pkl/permutations/${pheno}_${snps}_top${n_snps}_baseline/perm${p}.pkl"
+    echo "Submitting permutation" $p
+    qsub -V -v permute=True,p=${p},model_file=${model_file} fit_ukb.sh \
+        -o ./job-out/${pheno}_${p}.out \
+        -e ./job-out/${pheno}_${p}.err \
+        -N ${pheno}_${p}
+    sleep 0.5
 done
