@@ -74,7 +74,7 @@ class CoordinatedModel(Model):
         m = data.m
         k = self.k
 
-        tol = 1e-7
+        tol = 1e-6
 
         # for anchor snps
         pathways_mask = torch.ones(size = (m, k))
@@ -120,9 +120,10 @@ class CoordinatedModel(Model):
             if np.abs(currentLoss - prevLoss)/prevLoss < tol and iterations > 1:
                  break
             if iterations % 1000 == 0 and progress: 
-                print("(iterations,loss):", iterations, round(loss.item(), 3))
+                print("(iterations,loss):", iterations, round(loss.item(), 3), flush=True)
                 
             if iterations > 15000: 
+                print("warning: failed to converge", flush=True)
                 conv = False
                 break
 
@@ -143,7 +144,7 @@ class CoordinatedModel(Model):
         Y = data.pheno
         k = self.k
         
-        tol = 1e-7
+        tol = 1e-6
         additive_init = args.get('additive_init', True)
         init_noise = args.get('init_noise', 0.1)
         progress = args.get('progress', False)
@@ -220,10 +221,11 @@ class CoordinatedModel(Model):
             if np.abs(currentLoss - prevLoss)/prevLoss < tol and iterations > 1:
                  break
 
-            if iterations % 1000 == 0 and progress: 
-                print("(iterations,loss):", iterations, round(currentLoss, 3))
+            if iterations % 100 == 0 and progress: 
+                print("(iterations,loss):", iterations, round(currentLoss, 3), flush=True)
 
-            if iterations > 15000:
+            if iterations > 1500:
+                print("warning: failed to converge", flush=True)
                 conv = False
                 break
 
@@ -246,14 +248,16 @@ class CoordinatedModel(Model):
         k = self.k
 
         pathways = np.zeros((m, k))
+        const = 1
         if additive_init:
             lr = LinearRegression()
             lr.fit(data.geno, data.pheno)
             additive = lr.coef_.reshape(-1,)
             for i in range(k):
                 pathways[:, i] = additive/k
-
+            const = np.abs(pathways.sum(axis = 1)).mean()
         
+        init_noise *= const 
         weights = np.random.normal(0, init_noise, size = (k, k))
         weights = np.tril(weights, -1) + np.tril(weights, -1).T    
         pathways += np.random.normal(0, init_noise, size = (m, k))
@@ -314,6 +318,7 @@ class CoordinatedModel(Model):
         minLossRes = None
 
         for restart in range(restarts):
+            print(f'restart {restart + 1}', flush=True)
             if algo == 'grad':
                 res = self.gradDescent(data, kwargs)
             elif algo == 'coord':
