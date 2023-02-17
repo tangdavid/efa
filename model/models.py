@@ -6,7 +6,8 @@ from sklearn.linear_model import LinearRegression
 from scipy.stats import pearsonr
 from scipy.stats import multivariate_normal
 from scipy.optimize import minimize
-from scipy.linalg import khatri_rao, norm
+from scipy.linalg import khatri_rao
+import scipy.linalg
 
 import torch
 from torch import optim
@@ -301,7 +302,7 @@ class CoordinatedModel(Model):
             GU = G @ pathways
             interEffect = khatri_rao(GU.T, GU.T).T @ weights.reshape(-1, 1)
             mainEffect = np.sum(G @ pathways, axis=1, keepdims=True)
-            loss = norm(Y - mainEffect - interEffect)**2
+            loss = scipy.linalg.norm(Y - mainEffect - interEffect)**2
         
         return loss
 
@@ -406,6 +407,7 @@ class AdditiveModel(Model):
             lr.fit(data.geno, data.pheno)
             beta = lr.coef_.reshape(-1, 1)
         self.beta = beta
+        self.loss = scipy.linalg.norm(data.pheno - data.geno @ beta)
 
     def predictPheno(self, data):
         if hasattr(self, 'beta'):
