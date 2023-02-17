@@ -22,7 +22,8 @@ FOLDS=int(sys.argv[7])
 PERMUTE=sys.argv[8]=="True"
 RINT=sys.argv[9]=="True"
 SINK=sys.argv[10]=="True"
-ALGO=sys.argv[11]
+INIT_NOISE=float(sys.argv[11])
+ALGO=sys.argv[12]
 
 start = time.time()
 print('Loading Data...', flush=True)
@@ -40,15 +41,15 @@ ce_acc =list()
 am_acc = list()
 ep_acc = list()
 
-print('Fitting Model...')
+print('Fitting Model...', flush=True)
 for train, test in folds:
-    print('Next fold...')
+    print('Next fold...', flush=True)
 
     if PERMUTE:
-        print('Using Permuted Data...')
+        print('Using Permuted Data...', flush=True)
         train.permute()
 
-    ce = CoordinatedModel(k = 2)
+    ce = CoordinatedModel(k = 2, sink=SINK)
     am = AdditiveModel()
     ep = UncoordinatedModel()
     
@@ -59,7 +60,9 @@ for train, test in folds:
         additive_init=True,
         self_interactions=IS_SELF_INTERACT, 
         anchors=IS_ANCHOR,
-        sink=SINK
+        sink=SINK,
+        init_noise=INIT_NOISE,
+        progress=True
     )
     am.fitModel(train)
     ep.fitModel(train)
@@ -85,5 +88,5 @@ with open(MODEL_FILE, 'wb') as f:
     pkl.dump(res2_std, f)
 
 end = time.time()
-print('Done!')
-print('Time: %f' % (end - start))
+print('Done!', flush=True)
+print('Time: %f' % (end - start), flush=True)
