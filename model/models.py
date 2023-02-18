@@ -71,11 +71,10 @@ class CoordinatedModel(Model):
         self_interactions = args.get('self_interactions', False)
         anchors = args.get('anchors', None)
         progress = args.get('progress', False)
+        tol = args.get('tol', 1e-6)
 
         m = data.m
         k = self.k
-
-        tol = 1e-6
 
         # for anchor snps
         pathways_mask = torch.ones(size = (m, k))
@@ -145,10 +144,11 @@ class CoordinatedModel(Model):
         Y = data.pheno
         k = self.k
         
-        tol = 1e-6
+        
         additive_init = args.get('additive_init', True)
         init_noise = args.get('init_noise', 0.1)
         progress = args.get('progress', False)
+        tol = args.get('tol', 1e-6)
                 
         # initialize pathways and weights
         weights, pathways = self.initPathways(data, additive_init, init_noise)    
@@ -183,8 +183,8 @@ class CoordinatedModel(Model):
                 B2 = (2*(A*G).T @ Y) + (G.T @ Y) - (2*(A*G).T @ C) - (G.T @ C)
                 ui = np.linalg.solve(B1, B2)
                 pathways[:, i] = ui.reshape(-1,)
-                
-                
+
+
             # iteratively fit weights
             for i in range(k):
                 if i == k-1 and self.sink: continue
@@ -292,6 +292,7 @@ class CoordinatedModel(Model):
     def getLoss(self, data, pathways, weights, tensor = True):
         G = torch.tensor(data.geno).double() if tensor else data.geno
         Y = torch.tensor(data.pheno).double() if tensor else data.pheno
+        n = data.n
 
         if tensor:
             GU = G @ pathways
@@ -407,7 +408,7 @@ class AdditiveModel(Model):
             lr.fit(data.geno, data.pheno)
             beta = lr.coef_.reshape(-1, 1)
         self.beta = beta
-        self.loss = scipy.linalg.norm(data.pheno - data.geno @ beta)
+        self.loss = scipy.linalg.norm(data.pheno - data.geno @ beta) ** 2
 
     def predictPheno(self, data):
         if hasattr(self, 'beta'):
