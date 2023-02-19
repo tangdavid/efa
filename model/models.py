@@ -315,19 +315,20 @@ class CoordinatedModel(Model):
 
         restarts = kwargs.get('restarts', 10)
         algo = kwargs.get('algo', 'coord')
+        optimizer = self.coordDescent if algo == 'coord' else self.gradDescent
+        kwargs_no_noise = kwargs.copy()
+        kwargs_no_noise['init_noise'] = 0
 
-        minLoss = float('inf')
-        minLossRes = None
+        print('fitting no noise init...')
+        res = optimizer(data, kwargs_no_noise)
+
+        minLoss = res['loss'][-1]
+        minLossRes = res
 
         for restart in range(restarts):
+            if kwargs['init_noise'] == 0: continue
             print(f'restart {restart + 1}', flush=True)
-            if algo == 'grad':
-                res = self.gradDescent(data, kwargs)
-            elif algo == 'coord':
-                res = self.coordDescent(data, kwargs)
-            else:
-                print('error: algorithm must be either grad or coord')
-                return -1
+            optimizer(data, kwargs)
 
             if res['loss'][-1] < minLoss:
                 minLoss = res['loss'][-1]
