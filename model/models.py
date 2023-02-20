@@ -319,7 +319,7 @@ class CoordinatedModel(Model):
         kwargs_no_noise = kwargs.copy()
         kwargs_no_noise['init_noise'] = 0
 
-        print('fitting no noise init...')
+        print('fitting no noise init...', flush=True)
         res = optimizer(data, kwargs_no_noise)
 
         minLoss = res['loss'][-1]
@@ -328,7 +328,7 @@ class CoordinatedModel(Model):
         for restart in range(restarts):
             if kwargs['init_noise'] == 0: continue
             print(f'restart {restart + 1}', flush=True)
-            optimizer(data, kwargs)
+            res = optimizer(data, kwargs)
 
             if res['loss'][-1] < minLoss:
                 minLoss = res['loss'][-1]
