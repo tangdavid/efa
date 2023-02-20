@@ -149,6 +149,8 @@ class CoordinatedModel(Model):
         init_noise = args.get('init_noise', 0.1)
         progress = args.get('progress', False)
         tol = args.get('tol', 1e-6)
+        min_iter = args.get('min_iter', 1)
+        max_iter = args.get('max_iter', 1000)
                 
         # initialize pathways and weights
         weights, pathways = self.initPathways(data, additive_init, init_noise)    
@@ -219,13 +221,13 @@ class CoordinatedModel(Model):
             currentLoss = self.getLoss(data, pathways, weights, tensor = False)
             lossList.append(currentLoss)
             
-            if np.abs(currentLoss - prevLoss)/prevLoss < tol and iterations > 1:
+            if np.abs(currentLoss - prevLoss)/prevLoss < tol and iterations > min_iter:
                  break
 
             if iterations % 100 == 0 and progress: 
                 print("(iterations,loss):", iterations, round(currentLoss, 3), flush=True)
 
-            if iterations > 1500:
+            if iterations > max_iter:
                 print("warning: failed to converge", flush=True)
                 conv = False
                 break
