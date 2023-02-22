@@ -290,8 +290,14 @@ class RealDataset:
         residuals = np.random.permutation(residuals)
         self.pheno = residuals + residualize
 
-def splitTrain(data):
-    res = train_test_split(data.geno, data.pheno, test_size=0.2)
+    def bootstrap(self):
+        bootstrap_idx = np.random.choice(np.arange(self.n), self.n)
+        geno = self.geno[bootstrap_idx]
+        pheno = self.pheno[bootstrap_idx]
+        return RealDataset(geno = geno, pheno = pheno)
+
+def splitTrain(data, test_size = 0.2):
+    res = train_test_split(data.geno, data.pheno, test_size=test_size)
     train_G, test_G, train_Y, test_Y = res
     train = RealDataset(geno = train_G, pheno = train_Y)
     test = RealDataset(geno = test_G, pheno = test_Y)
