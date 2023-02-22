@@ -72,6 +72,8 @@ class CoordinatedModel(Model):
         anchors = args.get('anchors', None)
         progress = args.get('progress', False)
         tol = args.get('tol', 1e-6)
+        min_iter = args.get('min_iter', 1)
+        max_iter = args.get('max_iter', 1000)
 
         m = data.m
         k = self.k
@@ -117,12 +119,12 @@ class CoordinatedModel(Model):
             currentLoss = loss.item()
             lossList.append(currentLoss)
             
-            if np.abs(currentLoss - prevLoss)/prevLoss < tol and iterations > 1:
+            if np.abs(currentLoss - prevLoss)/prevLoss < tol and iterations > min_iter:
                  break
             if iterations % 1000 == 0 and progress: 
                 print("(iterations,loss):", iterations, round(loss.item(), 3), flush=True)
                 
-            if iterations > 15000: 
+            if iterations > max_iter: 
                 print("warning: failed to converge", flush=True)
                 conv = False
                 break
@@ -317,11 +319,13 @@ class CoordinatedModel(Model):
 
         restarts = kwargs.get('restarts', 10)
         algo = kwargs.get('algo', 'coord')
+        progress = kwargs.get('progress', False)
         optimizer = self.coordDescent if algo == 'coord' else self.gradDescent
         kwargs_no_noise = kwargs.copy()
         kwargs_no_noise['init_noise'] = 0
 
-        print('fitting no noise init...', flush=True)
+        if progress:
+            print('fitting no noise init...', flush=True)
         res = optimizer(data, kwargs_no_noise)
 
         minLoss = res['loss'][-1]
@@ -329,7 +333,8 @@ class CoordinatedModel(Model):
 
         for restart in range(restarts):
             if kwargs['init_noise'] == 0: continue
-            print(f'restart {restart + 1}', flush=True)
+            if progress:
+                print(f'restart {restart + 1}', flush=True)
             res = optimizer(data, kwargs)
 
             if res['loss'][-1] < minLoss:
