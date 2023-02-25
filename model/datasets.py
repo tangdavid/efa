@@ -284,10 +284,10 @@ class RealDataset:
         arr_rint = stats.norm.ppf((ranks+0.5)/arr.shape[0])
         return(arr_rint)
     
-    def permute(self, residualize=None):
+    def permute(self, residualize=None, seed=None):
         if residualize is None: residualize = np.zeros((self.n, 1))
         residuals = self.pheno - residualize
-        residuals = np.random.permutation(residuals)
+        residuals = np.random.RandomState(seed=seed).permutation(residuals)
         self.pheno = residuals + residualize
 
     def bootstrap(self):
