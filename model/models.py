@@ -328,26 +328,19 @@ class CoordinatedModel(Model):
             print('fitting no noise init...', flush=True)
         res = optimizer(data, kwargs_no_noise)
 
-        minLoss = res['loss'][-1]
-        minLossRes = res
+        if not res['conv'] and kwargs['init_noise'] != 0:
+            for restart in range(restarts):
+                if progress: print(f'restart {restart + 1}', flush=True)
+                res = optimizer(data, kwargs)
+                if res['conv']: break
 
-        for restart in range(restarts):
-            if kwargs['init_noise'] == 0: continue
-            if progress:
-                print(f'restart {restart + 1}', flush=True)
-            res = optimizer(data, kwargs)
-
-            if res['loss'][-1] < minLoss:
-                minLoss = res['loss'][-1]
-                minLossRes = res
-        
         self.m = data.m
-        self.loss = minLossRes['loss']
-        self.pathways = minLossRes['pathways']
-        self.beta = minLossRes['beta']
-        self.weights = minLossRes['weights']
-        self.omega = minLossRes['omega']
-        self.conv = minLossRes['conv']
+        self.loss = res['loss']
+        self.pathways = res['pathways']
+        self.beta = res['beta']
+        self.weights = res['weights']
+        self.omega = res['omega']
+        self.conv = res['conv']
     
     def predictPheno(self, data):
         G = data.geno
