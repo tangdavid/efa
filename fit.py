@@ -72,9 +72,9 @@ def main(args):
         progress=True,
         self_interactions=IS_SELF_INTERACT, 
         anchors=IS_ANCHOR,
-        tol=1e-7,
+        tol=1e-12,
         min_iter = 1,
-        max_iter = 1000
+        max_iter = 5000
     )
 
     with open(MODEL_FILE, 'wb') as f:
@@ -91,7 +91,7 @@ if __name__=="__main__":
     parser.add_argument("--out", default="./ce_out.pkl", type=str)
 
     parser.add_argument('--k', default=2, type=int)
-    parser.add_argument('--restarts', default=20, type=int)
+    parser.add_argument('--restarts', default=5, type=int)
     parser.add_argument('--init-noise', default=0.1, type=float)
     parser.add_argument('--permute-seed', type=int)
 
