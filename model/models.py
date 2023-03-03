@@ -118,11 +118,12 @@ class CoordinatedModel(Model):
             prevLoss = currentLoss
             currentLoss = loss.item()
             lossList.append(currentLoss)
+            loss_change = np.abs(currentLoss - prevLoss)/prevLoss
             
-            if np.abs(currentLoss - prevLoss)/prevLoss < tol and iterations > min_iter:
+            if loss_change < tol and iterations > min_iter:
                  break
             if iterations % 1000 == 0 and progress: 
-                print("(iterations,loss):", iterations, round(loss.item(), 3), flush=True)
+                print("(iterations,loss,conv): ", iterations, round(currentLoss, 3), "{0:.2E}".format(loss_change), flush=True)
                 
             if iterations > max_iter: 
                 print("warning: failed to converge", flush=True)
@@ -222,12 +223,13 @@ class CoordinatedModel(Model):
             prevLoss = currentLoss
             currentLoss = self.getLoss(data, pathways, weights, tensor = False)
             lossList.append(currentLoss)
+            loss_change = np.abs(currentLoss - prevLoss)/prevLoss
             
-            if np.abs(currentLoss - prevLoss)/prevLoss < tol and iterations > min_iter:
+            if loss_change < tol and iterations > min_iter:
                  break
 
             if iterations % 100 == 0 and progress: 
-                print("(iterations,loss):", iterations, round(currentLoss, 3), flush=True)
+                print("(iterations,loss,conv): ", iterations, round(currentLoss, 3), "{0:.2E}".format(loss_change), flush=True)
 
             if iterations > max_iter:
                 print("warning: failed to converge", flush=True)
