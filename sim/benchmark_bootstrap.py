@@ -1,3 +1,6 @@
+import sys
+sys.path.insert(0,'../model')
+
 import numpy as np
 from datasets import SimDataset, RealDataset, SimDatasetLD
 from models import AdditiveModel, CoordinatedModel
