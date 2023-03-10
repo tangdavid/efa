@@ -21,7 +21,6 @@ def main(args):
             dominance=True
         )
         true_weights = 0
-        fname = f'{args.name}_{args.h2_ep * 100}'
     elif args.name == 'efa':
         data = SimDataset(
             N, M, 
@@ -30,8 +29,10 @@ def main(args):
             h2=0.1, 
             additive_model_var=1 - args.h2_ep
         )
-        true_weights = data.weights[0, 1]
-        fname = f'{args.name}_{args.h2_ep * 100}'
+        if args.h2_ep == 0:
+            true_weights = 0
+        else:
+            true_weights = data.weights[0, 1]
     elif args.name == 'LD':
         data = SimDatasetLD(
             N, M, 
@@ -39,8 +40,8 @@ def main(args):
             h2=0.1
         )
         true_weights = 0
-        fname = f'{args.name}'
 
+    fname = f'{args.name}_{int(args.h2_ep * 100)}'
     path = f'./pkl/{fname}'
     if not os.path.exists(path):
         os.makedirs(path)
@@ -68,7 +69,7 @@ def main(args):
         additive_init=True, 
         tol = 1e-9,
         min_iter = 1,
-        max_iter = 2000
+        max_iter = 5000
     )
 
     efa = CoordinatedModel(k = 2, sink = False)
@@ -76,6 +77,8 @@ def main(args):
     res = np.zeros(n_bs)
     res_omega = np.zeros(n_bs)
     conv = np.zeros(n_bs, dtype=bool)
+    fit(efa, data)
+    full_fit = efa.weights[0, 1]
 
     for i in range(n_bs):
         if (i + 1) % 100 == 0: print(f'bs sample {i+1}...', flush=True)
@@ -89,13 +92,17 @@ def main(args):
         conv[i] = efa.conv
 
     lower = np.quantile(res[conv], 0.025)
+    median = np.quantile(res[conv], 0.5)
     upper = np.quantile(res[conv], 0.975)
     contained = (lower <= true_weights) and (upper >= true_weights)
     with open(fname, 'wb') as f:
         pkl.dump(contained, f)
+        pkl.dump(median, f)
+        pkl.dump(full_fit, f)
+        pkl.dump(true_weights, f)
         pkl.dump(res, f)
-        pkl.dump(res_omega, f)
         pkl.dump(conv, f)
+        pkl.dump(res_omega, f)
 
 if __name__=="__main__":
     parser = argparse.ArgumentParser()
