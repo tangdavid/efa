@@ -181,12 +181,10 @@ class CoordinatedModel(Model):
                 C2 = G @ pathways[:,pathway_mask].sum(axis=1, keepdims=True) 
                 C = C1 + C2
 
-                A = G @ pathways @ weights[i].reshape(-1, 1)
+                A = (2 * G @ pathways @ weights[i].reshape(-1, 1) + 1) * G
                 
-                # equations from the first order conditions
-                B1 = (4*G.T @ (A*A*G)) + (4*G.T @ (A*G)) + (G.T @ G)
-                B2 = (2*(A*G).T @ Y) + (G.T @ Y) - (2*(A*G).T @ C) - (G.T @ C)
-                ui = np.linalg.solve(B1, B2)
+                # ols
+                ui = np.linalg.solve(A.T @ A, A.T @ (Y - C))
                 pathways[:, i] = ui.reshape(-1,)
 
 
