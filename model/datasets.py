@@ -20,8 +20,7 @@ class SimDataset:
         sparse = 0, 
         self_interactions = True, 
         anchor_strength = 0.5, 
-        dominance = False,
-        store_inter = True
+        dominance = False
         ):
 
         self.n = n
@@ -41,7 +40,6 @@ class SimDataset:
         self.simGeno()
         self.simEffects()
         self.simPheno()
-        if not store_inter: del self.inter
 
     def simGeno(self):
         geno = np.zeros([self.n, self.m])
@@ -55,9 +53,7 @@ class SimDataset:
         geno -= np.mean(geno, axis = 0)
         geno /= np.std(geno, axis = 0)
 
-        # interaction effects as khatri rao
-        inter = khatri_rao(geno.T, geno.T).T
-        self.geno, self.inter = geno, inter
+        self.geno = geno
 
     def simEffects(self):
         m = self.m
@@ -109,7 +105,10 @@ class SimDataset:
         ebeta = np.random.normal(0, np.sqrt(var_ebeta), m).reshape(-1, 1)
         
         # scale additive and epistatic effect sizes
-        e_var = np.var(self.inter @ (omega + eomega).reshape(-1, 1))
+
+        e_var = np.var(
+            self.generatePairwiseEffects((omega + eomega).reshape(-1, 1))
+        )
         a_var = np.var(self.geno @ (beta + ebeta))
         
         scale = np.sqrt((a_var/self.additive_model_var - a_var)/e_var)
@@ -127,13 +126,27 @@ class SimDataset:
         self.normalizePheno()
         
     def normalizePheno(self):
-        std_mean = np.std(self.inter @ self.omega + self.geno @ self.beta)
+        std_mean = np.std(
+            self.generatePairwiseEffects(self.omega) +
+            self.geno @ self.beta
+        )
         scale = std_mean / np.sqrt(self.h2)
         self.pathways /= scale
         self.weights *= scale
         self.beta /= scale
         self.omegaMat /= scale
         self.eomega /= scale
+
+    def generatePairwiseEffects(self, omega):
+        N, M = self.geno.shape
+        res = np.zeros(shape = (N, 1))
+        for snp in range(M):
+            start = snp * M
+            end = start + M
+            res += (
+                self.geno[:, snp].reshape(-1, 1) * self.geno
+            ) @ omega[start:end, :]
+        return res
         
     def withEffectSizes(self, data):
         self.pathways = data.pathways
@@ -145,7 +158,7 @@ class SimDataset:
 
     def simPheno(self):
         # model with main effects and interactions
-        mean = self.inter @ self.omega + self.geno @ self.beta
+        mean = self.generatePairwiseEffects(self.omega) + self.geno @ self.beta
 
         # add noise to simulate heritability
         eps_std = np.sqrt(1 - self.h2)
@@ -160,7 +173,6 @@ class SimDataset:
 
 class SimDatasetLD:
     def __init__(self, n, m, r2 = 0, h2 = 0.5):
-        self.inter = None
         self.n = n
         self.m = m
         self.r2 = r2
@@ -209,7 +221,6 @@ class SimDatasetLD:
 
 class SimDatasetAdditive:
     def __init__(self, n, m, h2 = 0.5):
-        self.inter = None
         self.n = n
         self.m = m
         self.h2 = h2

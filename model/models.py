@@ -480,16 +480,14 @@ class UncoordinatedModel(Model):
         lr = LinearRegression(fit_intercept=True)
         
         Y = data.pheno - data.geno @ self.beta
-        inter = khatri_rao(data.geno.T, data.geno.T).T
         
-        omega = np.zeros(data.m ** 2)
+        omega = np.zeros((data.m, data.m))
         for i in range(data.m):
             for j in range(data.m):
-                idx = i * data.m + j    
-                interij = inter.T[idx]
+                interij = data.geno[:, i] * data.geno[:, j]
                 regressors = interij.reshape(-1, 1)
                 lr.fit(regressors, Y)
-                omega[idx] = lr.coef_.reshape(-1,)[0]
+                omega[i, j] = lr.coef_.reshape(-1,)[0]
         self.omega = omega.reshape(-1, 1)
     
     def fitModel(self, data, random_effects = False):
@@ -505,8 +503,14 @@ class UncoordinatedModel(Model):
         
     def predictPheno(self, data):
         if hasattr(self, 'beta') and hasattr(self, 'omega'):
-            inter = khatri_rao(data.geno.T, data.geno.T).T
-            return data.geno @ self.beta + inter @ self.omega
+            res = data.geno @ self.beta
+            for snp in range(data.m):
+                start = snp * data.m
+                end = start + data.m
+                res += (
+                    data.geno[:, snp].reshape(-1, 1) * data.geno
+                ) @ self.omega[start:end, :]
+            return  res
         if hasattr(self, 'var'):
             return self.imputePheno(data)
         else:
